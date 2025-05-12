@@ -1,0 +1,8 @@
+---
+title: "Welcome"
+format: html
+---
+
+# Welcome to my website
+
+I’m a Portuguese-Brazilian data scientist working on public AI, audits, and open research.
