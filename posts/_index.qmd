@@ -1,0 +1,10 @@
+---
+title: "Blog"
+listing: 
+  type: default
+  sort: "date desc"
+  categories: true
+  fields: [title, description, date]
+---
+
+Welcome to my blog! Below you'll find posts sorted by date.

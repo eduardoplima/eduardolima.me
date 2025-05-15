@@ -1,0 +1,647 @@
+---
+title: "Using LLMs to Extract Legal Entities from Audit Court Decisions"
+description: "This post demonstrates a hybrid pipeline with regular expressions and LLMs to extract fines, reimbursements, and recommendations from Brazilian audit court decisions."
+author: "Eduardo P. Lima"
+date: "2021-05-22"
+date-modified: "2021-05-23"
+---
+
+
+<a href="https://colab.research.google.com/github/eduardoplima/decisoes-lm/blob/main/decisoes.ipynb" target="_blank"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open in Colab"/></a>
+
+## Using LLMs for Analyzing Decisions of the State Audit Court of Rio Grande do Norte
+
+Audit Courts in Brazil have a range of constitutional duties, including the judgment of public accounts and the evaluation of personnel acts, such as hiring and retirement of civil servants. The collegiate body, typically composed of seven auditors, holds the authority to impose fines and obligations on public managers who fail to comply with legal norms or operational standards.
+
+In the case of the Audit Court of Rio Grande do Norte (TCE/RN), a recent restructuring has established the Procedural Instruction Directorate, responsible for reviewing, processing, and forwarding cases related to external control. Within this directorate, the Decision Control Coordination (CCD) is tasked with registering, monitoring, and tracking the enforcement of the Court's decisions and audit recommendations.
+
+The CCD also maintains the General Decision Tracking Registry (CGAD), established under Article 431 of the Internal Regulations of TCE/RN, which includes:
+
+* General Registry of Fines (CGM), for ongoing tracking of payments made directly to the Court;
+* General Registry of Reimbursements (CGD), for tracking orders for restitution to State and Municipal Treasuries;
+* General Registry of Recommendations (CGR), for tracking orders to perform or abstain from certain actions;
+* General Registry of Management Adjustment Agreements (CGTAG), for agreements negotiated by the Public Ministry with the Court.
+
+This notebook employs Named Entity Recognition (NER), word embeddings, and Large Language Models (LLMs) to automatically build these registries.
+
+```python
+!pip install pydantic langchain_openai langchain_community gdown langgraph pandas pypdf >> /dev/null
+```
+
+```python
+import os
+import getpass
+import gdown
+
+import typing
+import pydantic
+
+import pandas as pd
+
+from langchain.prompts import PromptTemplate, ChatPromptTemplate, FewShotChatMessagePromptTemplate
+from langchain_openai import OpenAI, ChatOpenAI
+```
+
+```python
+os.environ["OPENAI_API_KEY"] = getpass.getpass("OPENAI_API_KEY:")
+```
+
+## Environment Setup
+
+Install and import the required Python packages for working with LLMs, document parsing, and data manipulation.
+
+```python
+import pypdf
+
+def read_pdf(url):
+    return [page.extract_text() for page in pypdf.PdfReader(url).pages]
+```
+
+```python
+url = "https://raw.githubusercontent.com/eduardoplima/decisoes-lm/refs/heads/main/dataset.json"
+output = "dataset.json"
+gdown.download(url, output)
+
+url = "https://raw.githubusercontent.com/eduardoplima/decisoes-lm/refs/heads/main/tipos_processos.csv"
+output = "tipos_processos.csv"
+gdown.download(url, output)
+```
+
+```python
+tipos = pd.read_csv("tipos_processos.csv")
+```
+
+```python
+df = pd.read_json("dataset.json")
+```
+
+```python
+len(df)
+```
+
+```python
+df.columns
+```
+
+```python
+
+```
+
+```python
+df.head()
+```
+
+## File Preparation
+
+Download the dataset containing decisions from TCE/RN and save it locally for processing.
+
+```python
+df['texto'] = df['texto'].apply(lambda x: ''.join(x))
+```
+
+## Dataset Loading
+
+Load the CSV file containing the decisions. We'll examine the structure and content of the dataset.
+
+```python
+print(df.iloc[15].texto)
+```
+
+## Initial Exploration
+
+Preview the dataset and review examples from the 'conclusao' column, which will be used to extract entities.
+
+```python
+print(df.iloc[20].texto)
+```
+
+## Manual Rules for NER
+
+Define initial heuristics to extract named entities from the decision text using regular expressions.
+
+```python
+print(df[df.codigo_tipo_processo == 'TAG'].iloc[0].texto)
+```
+
+## Cleaned Entity Extraction
+
+Use regex to extract structured entities such as fines, reimbursements, and obligations from the 'conclusao' field.
+
+```python
+llm = ChatOpenAI(temperature=0, model_name='gpt-4o')
+```
+
+```python
+print(llm)
+```
+
+## Entity Types: Fines and Sanctions
+
+Identify and extract different types of fines: standard fine, daily coercive fine, percentage-based reimbursement.
+
+```python
+pages_relatorio = read_pdf("relatorio_teste.pdf")
+pages_relatorio2 = read_pdf("relatorio_teste_2.pdf")
+pages_relatorio3 = read_pdf("relatorio_teste_3.pdf")
+```
+
+```python
+
+```
+
+```python
+
+```
+
+```python
+from typing import Optional, List
+from pydantic import BaseModel, Field
+
+class Criterio(BaseModel):
+  """Critério para determinação de irregularidade"""
+  descricao: str = Field(description="Texto descritivo do critério")
+
+class Encaminhamento(BaseModel):
+  """Encaminhamento de irregularidade"""
+  descricao: str = Field(description="Texto descritivo do encaminhamento")
+
+class Irregularidade(BaseModel):
+  """Irregularidade encontrada no relatório"""
+  criterio: Criterio = Field(description="Critério que determina a irregularidade")
+  encaminhamento: Encaminhamento = Field(description="Encaminhamento para a irregularidade")
+
+class Relatorio(BaseModel):
+  """Relatorio de Auditoria"""
+  diretoria: str = Field(description="Nome da diretoria que realizou a auditoria")
+  auditores: List[str] = Field(description="Auditores que escreveram o relatório")
+  irregularidades: List[Irregularidade] = Field(description="Irregulidades encontradas no relatório")
+
+def identify_relatorio(relatorio):
+  prompt = PromptTemplate.from_template("""
+ Você é um agente que identifica irregularidades apontadas em relatórios de auditoria.
+Você recebeu um relatório de auditoria e precisa identificar quais são as irregularidades apontadas no relatório.
+
+Relatório : {input}
+
+Sua resposta: """)
+
+  structured_llm = llm.with_structured_output(schema=Relatorio)
+  chain = prompt | structured_llm
+  response = chain.invoke({"input": relatorio})
+  return response
+
+def identify_pagina_irregularidade(page):
+  prompt = PromptTemplate.from_template("""
+ Você é um agente que identifica se uma página de um relatório de auditoria contém uma lista de irregularidades.
+Você recebeu uma página de um relatório de auditoria e precisa identificar se a página contém irregularidades.
+                                        Responda com Sim apenas se na página houver uma lista de irregularidades.
+                                        
+                                        Responda apenas com S para sim e N para não.
+
+Página : {input}
+                                        Suas respostas: """)
+  chain = prompt | llm
+  response = chain.invoke({"input": page})
+  return response
+```
+
+```python
+[(i, identify_pagina_irregularidade(p).content) for i,p in enumerate(pages_relatorio2)]
+```
+
+```python
+r = identify_relatorio(''.join(pages_relatorio3))
+```
+
+```python
+for i in r.irregularidades:
+    print(i)
+```
+
+```python
+r = identify_relatorio(relatorio)
+```
+
+```python
+for i in r.irregularidade:
+    print(i)
+```
+
+```python
+r2 = identify_relatorio(relatorio2)
+```
+
+```python
+for i in r2.irregularidade:
+    print(i)
+```
+
+```python
+prompt = PromptTemplate.from_template("""
+Você é um agente que identifica irregularidades apontadas em relatórios de auditoria.
+Você recebeu um relatório de auditoria e precisa identificar quais são as irregularidades apontadas no relatório.
+
+Relatório : {input}
+
+Sua resposta:
+""")
+
+chain = prompt | llm
+response = chain.invoke({"input": relatorio})
+```
+
+```python
+print(response.content)
+```
+
+```python
+llm
+```
+
+```python
+monitoramentos = df[df['texto'].str.contains('monitoramento')]
+```
+
+```python
+len(monitoramentos)
+```
+
+```python
+len(df)
+```
+
+## Entity Types: Recommendations and Obligations
+
+Extract judicial recommendations and compliance obligations, distinguishing between 'do' and 'do not do'.
+
+```python
+def classify_decision(state):
+  examples = [
+      {
+          "input": """
+          - Adoção das providências cabíveis no tocante aos indícios de impropriedades /irregularidades
+  elencadas na tabela 19 do Relatório (transcritas acima ), com fundamento no art. 2º, inciso III, da
+  Resolução nº 012/2023-TCE, notadamente para que a Secretaria de Controle Externo analise a
+  capacidade operacional desta Corte com vistas ao acompanhamento e /ou à abertura de processo
+  autônomo, respeitadas a conveniência e oportunidade, referente aos itens 4.2 (Divergência dos
+  dados do planejamento do Projeto, Inconsistência dos saldos da conta bens móveis entre os
+  registros do SIGEF - Sistema Integrado de Planejamento e Gestão Fiscal - e SMI - Sistema de
+  Monitoramento e Informações do Projeto - e deficiências na elaboração das notas explicativas ),
+  5.5.1.1 (Inventário físico ), 5.6.1.1 ( Falhas/deficiências construtivas do Hospital Regional da
+  Mulher Parteira Maria Correia) e 5.6.1.3 (Pendências de legalização das obras da Biblioteca
+  Câmara Cascudo e da Sede do Serviço Nacional de Emprego – SINE).""",
+          "output": "DETERMINACAO"}, {
+          "input": """( a.i) promovam, no prazo de 120 (cento e vinte dias) úteis, contados a partir da intimação da
+  presente Decisão, a apuração dos fatos e se verifique a constitucionalidade e legalidade dos
+  vínculos funcionais de cada servidor que figura nos Anexos nºs. 01 e 02 contidos nos Eventos
+  nºs. 04 e 05, além de outros que porventura sejam informados pela DDP em cumprimento ao
+  item b, por meio da instauração de processos administrativos disciplinares individuais ,
+  regulados pela Lei que trata do Estatuto Jurídico dos Servidores do respectivo Município ,
+  com observância dos princípios do contraditório, ampla defesa e devido processo legal;
+    ( a.ii) comprovem neste feito, em 05 dias úteis após ultimado o prazo de definição dos PAD
+  ´s, as conclusões de todos os processos administrativos instaurados, no tocante à eliminação
+  de tríplice vínculo funcional identificado e de enquadramento das eventuais acumulações
+  dúplices nas hipóteses permitidas pela Constituição Federal, com a respectiva
+  compatibilidade de horários, sob pena de, não cumprindo tais obrigações nos prazos antes
+  referidos, incidir em multa diária e pessoal ao gestor, no valor de R$ 500,00, com espeque no
+  art. 110 da LCE nº 464/2012 c/c o art. 326 do RITCE, cabendo à Diretoria de Despesa com
+  Pessoal monitorar o cumprimento da presente Decisão;""",
+          "output": "DETERMINACAO"}, {
+          "input": """Vistos, relatados e discutidos estes autos, em consonância ao posicionamento do
+  Corpo técnico e do Ministério Público de Contas, ACORDAM os Conselheiros, nos termos
+  do voto proposto pelo Conselheiro Relator, julgar a inadmissibilidade da presente denúncia e
+  o seu conseqüente arquivamento, com fulcro nos art. 12 do Provimento 002/2020 –
+  CORREG/TCE, aprovado pela Resolução 016/2020 – TCE e artigo 80, § 1º, da LOTCE.
+  E ainda, Pela expedição de RECOMENDAÇÃO, nos termos do art. 301, III da Resolução
+  009/2012 (RITCE/RN) c/c art. 13, II da Resolução 16/2020 –TCE/RN, ao Executivo
+  Municipal de Nísia Floresta /RN, com cópia para o respectivo órgão de controle interno, ou
+  setor responsável pelas publicações oficiais, lastreada na Constituição Federal de 88/ Art. 37,
+  a fim de que promova e deixe claro os seguintes comportamentos em suas postagens""",
+          "output": "DETERMINACAO"},{
+          "input": """Vistos, relatados e discutidos estes autos, concordando com o proposto pelo Corpo
+  Técnico e pelo órgão Ministerial de Contas, ACORDAM os Conselheiros, nos termos do voto
+  proferido pelo Conselheiro Relator, julgar pela irregularidade da matéria, nos termos do art .
+  75, inciso I, da Lei Complementar nº 464/2012, condenando o gestor responsável, Sr. Thiago
+  Meira Mangueira, ao pagamento de multa no valor de R$ 18.774,51 (dezoito mil setecentos e
+  setenta e quatro reais e cinquenta e um centavos ), conforme previsto no art. 21, inciso I ,
+  alínea ‘a’ e § 1º, da Resolução nº 012/2016-TCE c /c o art. 107, inciso II, alínea “a” da Lei
+  Complementar nº 464/2012. """,
+          "output": "DETERMINACAO"},
+          {
+              "input": """Vistos, relatados e discutidos estes autos, acolhendo os fundamentos do parecer
+  ministerial, com substrato no art. 209 V da norma regimental, ACORDAM os Conselheiros ,
+  nos termos do voto proposto pela Conselheira Relatora, julgar pelo ARQUIVAMENTO dos
+  autos.""",
+              "output": "OUTROS",
+          },
+          {
+              "input": """Vistos, relatados e discutidos estes autos, ACORDAM os Conselheiros,  com o
+  impedimento do Conselheiro Presidente Renato Costa Dias, nos termos do voto profposto
+  pela Conselheira Relatora, haja vista os fundamentos fático -jurídicos explanados no excerto
+  antecedente, comprovado documentalmente o adimplemento substancial do plano de
+  redimensionamento/adequação do sistema de ensino natalense, julgar pela EXTINÇÃO do
+  FEITO nos termos do art. 71 da Lei Complementar (estadual) c/c art. 22 §1° da LINDB e art .
+  209 V da regra regimental.""",
+              "output": "OUTROS",
+          },
+          {
+              "input": """Vistos, relatados e discutidos estes autos, em consonância com o posicionamento da
+  Diretoria de Administração Municipal – DAM e do Ministério Público de Contas ,
+  ACORDAM os Conselheiros, nos termos do voto proferido pelo Conselheiro Relator, julgar
+  pelo reconhecimento da incidência da Prescrição Intercorrente sobre a pretensão punitiva e
+  ressarcitória desta Corte de Contas, nos termos do artigo 111, parágrafo único, da Lei
+  Complementar Estadual nº 464/2012, com o consequente arquivamento dos presentes autos.
+  E ainda, pelo envio de cópia das principais peças dos autos ao Ministério Público Estadual ,
+  para conhecimento e atuação no âmbito de sua competência.""",
+              "output": "OUTROS",
+          },
+          {
+              "input": """Vistos, relatados e discutidos estes autos, em dissonância com o Ministério Público
+  de Contas, ACORDAM os Conselheiros, nos termos do voto proferido pelo Conselheiro
+  Relator, julgar pela extinção do feito, sem julgamento de mérito, com o consequente
+  ARQUIV AMENTO dos autos, em virtude da incompatibilidade entre a emissão de parecer
+  prévio pela aprovação com ressalvas das contas de governo e a instauração de apuração de
+  responsabilidade para aplicação de sanções.""",
+              "output": "OUTROS",
+          }
+  ]
+
+  example_prompt = ChatPromptTemplate.from_messages([
+        ("human", '''
+         {input} '''),
+        ("ai", "{output}"),
+    ])
+
+  few_shot_prompt = FewShotChatMessagePromptTemplate(
+    example_prompt=example_prompt,
+    examples=examples,)
+
+  final_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", """Você é um classificador de decisões de um tribunal de contas.
+         Sua tarefa é definir se uma decisão trata de uma multa ou obrigação
+         de fazer.
+
+         Responda com DETERMINACAO se o texto contiver o termo "multa" e alguma recomendação ou obrigação de fazer
+         Responda com OUTROS se o texto tratar de arquivamento, extinção do feito ou prescrição da matéria, ou outro assunto que não seja DETERMINACAO
+
+         Responda APENAS com DETERMINACAO ou OUTROS."""),
+        few_shot_prompt,
+        ("human", "{input}"),])
+
+  chain = final_prompt | llm
+  decision_type = chain.invoke({"input": state["messages"]}).content
+  state['messages'] = state['messages'] + [decision_type]
+  return state
+```
+
+## Structured Output Example
+
+Show how the extracted entities can be structured for analysis and registration in the CGAD system.
+
+```python
+
+```
+
+```python
+classify_decision({'messages': [df.iloc[1].texto]})
+```
+
+```python
+print(df.iloc[1].texto)
+```
+
+```python
+classify_decision({'messages': [df.iloc[0].texto]})
+```
+
+```python
+print(df.iloc[0].texto)
+```
+
+## Using LangChain for LLM Integration
+
+Configure a LangChain pipeline using OpenAI or local models to extract and structure named entities.
+
+```python
+from typing import Optional, List
+
+from pydantic import BaseModel, Field
+
+class Multa(BaseModel):
+  """Determinação de multa, com valor e responsável"""
+  responsavel: str = Field(description="Nome do responsável pela multa")
+  valor: float = Field(description="Valor da multa")
+
+class Obrigacao(BaseModel):
+  """Determinação de obrigação, com valor e responsável"""
+  responsavel: str = Field(description="Nome do órgão ou gestor responsável pela obrigação")
+  descricao: str = Field(description="Texto descritivo da obrigação")
+
+class Decisao(BaseModel):
+  """Decisão processual do TCE/RN"""
+  determinacao: List[Optional[Multa | Obrigacao]] = Field(description="Determinação de multa ou obrigação")
+
+def identify_decision(state):
+  prompt = PromptTemplate.from_template("""
+  Você é um agente que identifica listas de determinações em textos de decisões. Seu objetivo
+  é extrair um conjunto de textos de uma lista que contém obrigações ou imposições de multas. Se não houver
+  determinações, responda apenas com "N/D"
+
+  Decisão : {input}
+
+  Sua resposta:
+  """)
+
+  structured_llm = llm.with_structured_output(schema=Decisao)
+  chain = prompt | structured_llm
+  response = chain.invoke(state['messages'])
+  state['messages'] = state['messages'] + [response]
+  return state
+```
+
+```python
+
+```
+
+```python
+d = identify_decision({'messages': [df.iloc[1].texto]})
+```
+
+```python
+'determinacao' in d['messages'][-1].__dict__
+```
+
+```python
+d['messages'][-1].determinacao[0]
+```
+
+```python
+print(df.iloc[1].texto)
+```
+
+## Prompt Engineering
+
+Design prompts for the LLM to correctly identify and classify the entities mentioned in the text.
+
+## Output Validation
+
+Validate the structured output returned by the model against expected schemas.
+
+```python
+from langchain_core.tools import StructuredTool
+
+def search_pessoa(nome):
+  """Procura dados de uma pessoa"""
+  return {
+    'nome': nome,
+    'endereço': 'Av Tal, Bairro Bem Ali, nº 1',
+    'telefone': '84123456789'
+  }
+
+search_pessoa_tool = StructuredTool.from_function(func=search_pessoa, parse_docstring=True, )
+```
+
+```python
+search_pessoa_tool.to_json()
+```
+
+```python
+llm_with_tools = llm.bind_tools([search_pessoa_tool])
+```
+
+```python
+response = identify_decision({'messages': df.iloc[1].texto})
+```
+
+```python
+response['determinacoes'].determinacao[0]
+```
+
+```python
+response = llm_with_tools.invoke(str(response['determinacoes'].determinacao[0].responsavel))
+```
+
+```python
+response.tool_calls
+```
+
+## Future Improvements
+
+Discuss how weak supervision or fine-tuned models could improve accuracy and reduce false positives.
+
+```python
+texto = df.iloc[1].texto
+```
+
+```python
+print(texto)
+```
+
+```python
+from langgraph.prebuilt  import ToolNode
+
+tool_node = ToolNode([search_pessoa_tool])
+```
+
+```python
+import operator
+from typing import Annotated, Sequence, TypedDict
+from langchain_core.messages import BaseMessage
+
+class AgentState(TypedDict):
+    messages: Annotated[Sequence[BaseMessage], operator.add]
+```
+
+```python
+from langchain_core.messages import ToolMessage
+from langgraph.prebuilt import ToolInvocation
+
+def should_continue_classify(state):
+    if not state['messages'][-1]:
+        return "end"
+    else:
+        return "continue"
+
+def should_continue_identify(state):
+    if not state['messages'][-1] == 'DETERMINACAO':
+        return "end"
+    else:
+        return "continue"
+
+def call_model(state):
+    messages = state["messages"]
+    response = llm_with_tools.invoke(messages)
+    return response
+
+def call_tool(state):
+  print(state['messages'][-1].__dict__.keys())
+  if 'determinacao' in state['messages'][-1].__dict__.keys():
+    for determinacao in state['messages'][-1].determinacao:
+      if not determinacao.responsavel:
+        continue
+      response = llm_with_tools.invoke(str(determinacao.responsavel))
+      print(response)
+      response = tool_node.invoke({'messages': [response]})
+      state['messages'] = state['messages'] + [response['messages']]
+      return state
+```
+
+```python
+from langgraph.graph import END, StateGraph, START
+
+workflow = StateGraph(AgentState)
+workflow.add_node("classify", classify_decision)
+workflow.add_node("identify", identify_decision)
+workflow.add_node("search", call_tool)
+workflow.add_edge(START, "classify")
+workflow.add_edge("search", END)
+
+workflow.add_conditional_edges(
+    "classify",
+    should_continue_classify,
+    {
+        "continue": "identify",
+        "end": END,
+    },
+)
+
+workflow.add_conditional_edges(
+    "identify",
+    should_continue_classify,
+    {
+        "continue": "search",
+        "end": END,
+    },
+)
+
+app = workflow.compile()
+```
+
+```python
+from IPython.display import Image, display
+from langchain_core.runnables.graph import CurveStyle
+
+try:
+    graph_image = app.get_graph(xray=True).draw_mermaid_png(curve_style=CurveStyle.NATURAL)
+    display(Image(graph_image))
+except Exception as e:
+    print(e)
+```
+
+```python
+inputs = {"messages": [df.iloc[1].texto]}
+result = app.invoke(inputs)
+```
+
+```python
+result
+```
+
+## Conclusion
+
+This notebook outlines a hybrid approach using heuristics and LLMs to extract key data from legal decisions, contributing to improved compliance tracking.
+
+```python
+
+```
