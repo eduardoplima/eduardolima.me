@@ -11,7 +11,7 @@ categories:
   - Named Entity Recognition
 ---
 
-<a href="https://colab.research.google.com/github/eduardoplima/annotation-error-detection-lener-br/blob/main/aed-lener.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+<a href="https://colab.research.google.com/github/eduardoplima/aed-lener-br/blob/main/aed-lener-br-en.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 # Annotation Error Detection in the LeNER-Br Dataset
 

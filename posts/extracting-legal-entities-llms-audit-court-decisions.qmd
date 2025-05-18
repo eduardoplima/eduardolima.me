@@ -11,7 +11,7 @@ categories:
 ---
 
 
-<a href="https://colab.research.google.com/github/eduardoplima/decisoes-lm/blob/main/decisoes.ipynb" target="_blank"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open in Colab"/></a>
+<a href="https://colab.research.google.com/github.com/eduardoplima/annotation-error-detection-lener-br/blob/main/aed-lener.ipynb" target="_blank"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open in Colab"/></a>
 
 ## Using LLMs for Analyzing Decisions of the State Audit Court of Rio Grande do Norte
 
