@@ -15,3 +15,5 @@ format:
   html:
     theme: flatly
     toc: true
+    page-layout: full
+

@@ -142,7 +142,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </nav>
 </header>
 <!-- content -->
-<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-full page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
@@ -160,7 +160,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content">
+<main class="content column-page-left" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
@@ -179,7 +179,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 
 
-<div class="quarto-title-meta">
+<div class="quarto-title-meta column-page-left">
 
     <div>
     <div class="quarto-title-meta-heading">Author</div>
@@ -214,7 +214,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h1>Annotation Error Detection in the LeNER-Br Dataset</h1>
 <p>Annotation Error Detection is a technique used to identify inconsistencies or incorrect labels in manually annotated datasets. These errors can compromise the quality of models trained on this data for tasks such as Named Entity Recognition. Detection tools and methods aim to locate these flaws automatically, ensuring greater data reliability and better model performance.</p>
 <p>In this notebook, we will analyze the LeNER-Br dataset with the goal of identifying possible annotation errors using the confident learning technique, implemented by the Cleanlab library. This approach allows for the detection of incorrectly labeled instances based on the probabilistic predictions of a classifier, as we will see in the code below.</p>
-<p>The LeNER-Br dataset is a Portuguese corpus focused on Named Entity Recognition (NER) in Brazilian legal texts. Developed by Luz et al.&nbsp;(2018), LeNER-Br is composed exclusively of legal documents, such as judicial decisions and opinions, collected from various Brazilian courts. It was manually annotated to identify entities like people, organizations, locations, and temporal expressions, in addition to specific legal categories such as LEGISLATION and JURISPRUDENCE, which are not common in other Portuguese corpora. The complete description of the work can be read in the article available at https://teodecampos.github.io/LeNER-Br/luz_etal_propor2018.pdf</p>
+<p>The LeNER-Br dataset is a Portuguese corpus focused on Named Entity Recognition (NER) in Brazilian legal texts. Developed by Luz et al.&nbsp;(2018), LeNER-Br is composed exclusively of legal documents, such as judicial decisions and opinions, collected from various Brazilian courts. It was manually annotated to identify entities like people, organizations, locations, and temporal expressions, in addition to specific legal categories such as LEGISLATION and JURISPRUDENCE, which are not common in other Portuguese corpora. The complete description of the work can be read in the article available at <a href="https://teodecampos.github.io/LeNER-Br/luz_etal_propor2018.pdf">https://teodecampos.github.io/LeNER-Br/luz_etal_propor2018.pdf</a></p>
 </section>
 <section id="environment-setup" class="level1">
 <h1>Environment Setup</h1>
