@@ -2,8 +2,8 @@
   {
     "listing": "/index.html",
     "items": [
-      "/posts/aed-lener.html",
-      "/posts/decisoes.html"
+      "/posts/annotation-error-detection-legal-ner-cleanlab.html",
+      "/posts/extracting-legal-entities-llms-audit-court-decisions.html"
     ]
   }
 ]
