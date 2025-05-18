@@ -1,8 +1,11 @@
 ---
-title: "Welcome"
-format: html
+title: "Eduardo Lima's Blog"
+description: "Browse through all my blog entries on data science, public audits, NLP, AI, and more."
+listing:
+  contents: posts
+  sort: "date desc"
+  type: default
+  categories: true
+  fields: [title, date, categories, description]
+  #filter-ui: true
 ---
-
-# Welcome to my website
-
-I’m a Portuguese-Brazilian data scientist working on public AI, audits, and open research.

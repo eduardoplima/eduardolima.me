@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.31">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Eduardo P. Lima">
+<meta name="dcterms.date" content="2025-05-18">
+<meta name="description" content="This post applies confident learning techniques with Cleanlab to detect annotation errors in the LeNER-Br dataset, enhancing the quality of legal named entity recognition tasks.">
+
+<title>Annotation Error Detection in Legal NER Datasets with Cleanlab – Eduardo P. Lima</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e1a5c8363afafaef2c763b6775fbf3ca.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-494f656f63d1238b366f4e6b61f952ab.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Eduardo P. Lima</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#annotation-error-detection-in-the-lener-br-dataset" id="toc-annotation-error-detection-in-the-lener-br-dataset" class="nav-link active" data-scroll-target="#annotation-error-detection-in-the-lener-br-dataset">Annotation Error Detection in the LeNER-Br Dataset</a></li>
+  <li><a href="#environment-setup" id="toc-environment-setup" class="nav-link" data-scroll-target="#environment-setup">Environment Setup</a></li>
+  <li><a href="#token-extraction" id="toc-token-extraction" class="nav-link" data-scroll-target="#token-extraction">Token Extraction</a></li>
+  <li><a href="#model-training" id="toc-model-training" class="nav-link" data-scroll-target="#model-training">Model Training</a></li>
+  <li><a href="#issues-found-with-the-dataset" id="toc-issues-found-with-the-dataset" class="nav-link" data-scroll-target="#issues-found-with-the-dataset">Issues Found with the Dataset</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Annotation Error Detection in Legal NER Datasets with Cleanlab</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Data Science</div>
+    <div class="quarto-category">Annotation Error Detection</div>
+    <div class="quarto-category">Named Entity Recognition</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    This post applies confident learning techniques with Cleanlab to detect annotation errors in the LeNER-Br dataset, enhancing the quality of legal named entity recognition tasks.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Eduardo P. Lima </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">May 18, 2025</p>
+    </div>
+  </div>
+  
+    <div>
+    <div class="quarto-title-meta-heading">Modified</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date-modified">May 18, 2025</p>
+    </div>
+  </div>
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><a href="https://colab.research.google.com/github/eduardoplima/aed-lener-br/blob/main/aed-lener-br-en.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a></p>
+<section id="annotation-error-detection-in-the-lener-br-dataset" class="level1">
+<h1>Annotation Error Detection in the LeNER-Br Dataset</h1>
+<p>Annotation Error Detection is a technique used to identify inconsistencies or incorrect labels in manually annotated datasets. These errors can compromise the quality of models trained on this data for tasks such as Named Entity Recognition. Detection tools and methods aim to locate these flaws automatically, ensuring greater data reliability and better model performance.</p>
+<p>In this notebook, we will analyze the LeNER-Br dataset with the goal of identifying possible annotation errors using the confident learning technique, implemented by the Cleanlab library. This approach allows for the detection of incorrectly labeled instances based on the probabilistic predictions of a classifier, as we will see in the code below.</p>
+<p>The LeNER-Br dataset is a Portuguese corpus focused on Named Entity Recognition (NER) in Brazilian legal texts. Developed by Luz et al.&nbsp;(2018), LeNER-Br is composed exclusively of legal documents, such as judicial decisions and opinions, collected from various Brazilian courts. It was manually annotated to identify entities like people, organizations, locations, and temporal expressions, in addition to specific legal categories such as LEGISLATION and JURISPRUDENCE, which are not common in other Portuguese corpora. The complete description of the work can be read in the article available at https://teodecampos.github.io/LeNER-Br/luz_etal_propor2018.pdf</p>
+</section>
+<section id="environment-setup" class="level1">
+<h1>Environment Setup</h1>
+<p>We install the Cleanlab library, which will be used to apply confident learning techniques to identify possible annotation errors in the LeNER-Br dataset. Then, we import the necessary libraries for the rest of the analysis and download the training and test files directly from the official LeNER-Br repository. As the files are in CoNLL format, which organizes data in columns, it is necessary to convert them to the BIO (Beginning, Inside, Outside) format, widely used in Named Entity Recognition tasks, to facilitate subsequent processing.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">#!pip install cleanlab</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> re</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> requests</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> zipfile</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> StratifiedKFold</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.preprocessing <span class="im">import</span> LabelEncoder</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LogisticRegression</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> accuracy_score</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> SGDClassifier</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> transformers <span class="im">import</span> AutoTokenizer, AutoModel</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cleanlab.<span class="bu">filter</span> <span class="im">import</span> find_label_issues</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>wget https:<span class="op">//</span>raw.githubusercontent.com<span class="op">/</span>eduardoplima<span class="op">/</span>aed<span class="op">-</span>lener<span class="op">-</span>br<span class="op">/</span>refs<span class="op">/</span>heads<span class="op">/</span>main<span class="op">/</span>leNER<span class="op">-</span>Br<span class="op">/</span>train<span class="op">/</span>train.conll</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>wget https:<span class="op">//</span>raw.githubusercontent.com<span class="op">/</span>eduardoplima<span class="op">/</span>aed<span class="op">-</span>lener<span class="op">-</span>br<span class="op">/</span>refs<span class="op">/</span>heads<span class="op">/</span>main<span class="op">/</span>leNER<span class="op">-</span>Br<span class="op">/</span>test<span class="op">/</span>test.conll</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<pre><code>--2025-05-17 21:16:22--  https://raw.githubusercontent.com/eduardoplima/aed-lener-br/refs/heads/main/leNER-Br/train/train.conll
+Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 185.199.108.133, 185.199.109.133, 185.199.110.133, ...
+Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|185.199.108.133|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 2142199 (2.0M) [text/plain]
+Saving to: ‘train.conll’
+
+train.conll         100%[===================&gt;]   2.04M  --.-KB/s    in 0.01s   
+
+2025-05-17 21:16:22 (198 MB/s) - ‘train.conll’ saved [2142199/2142199]
+
+--2025-05-17 21:16:22--  https://raw.githubusercontent.com/eduardoplima/aed-lener-br/refs/heads/main/leNER-Br/test/test.conll
+Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 185.199.108.133, 185.199.109.133, 185.199.110.133, ...
+Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|185.199.108.133|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 438441 (428K) [text/plain]
+Saving to: ‘test.conll’
+
+test.conll          100%[===================&gt;] 428.17K  --.-KB/s    in 0.004s  
+
+2025-05-17 21:16:23 (106 MB/s) - ‘test.conll’ saved [438441/438441]</code></pre>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>NUM_FOLDS_CV <span class="op">=</span> <span class="dv">5</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>RANDOM_SEED <span class="op">=</span> <span class="dv">43</span> <span class="co"># almost 42 😂 (and prime!)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> load_conll_lener(file_path):</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    sentences <span class="op">=</span> []</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    current_sentence_tokens <span class="op">=</span> []</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    current_sentence_labels <span class="op">=</span> []</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> <span class="bu">open</span>(file_path, <span class="st">'r'</span>, encoding<span class="op">=</span><span class="st">'utf-8'</span>) <span class="im">as</span> f:</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> line <span class="kw">in</span> f:</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>          line <span class="op">=</span> line.strip()</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>          <span class="cf">if</span> line:</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>              parts <span class="op">=</span> line.split()</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>              <span class="cf">if</span> <span class="bu">len</span>(parts) <span class="op">&gt;=</span> <span class="dv">2</span>:</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>                  token <span class="op">=</span> parts[<span class="dv">0</span>]</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>                  ner_tag <span class="op">=</span> parts[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>                  current_sentence_tokens.append(token)</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>                  current_sentence_labels.append(ner_tag)</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>              <span class="cf">else</span>:</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>                  <span class="cf">pass</span> <span class="co"># Or handle malformed lines</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>          <span class="cf">else</span>:</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>              <span class="cf">if</span> current_sentence_tokens:</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>                  sentences.append(<span class="bu">list</span>(<span class="bu">zip</span>(current_sentence_tokens, current_sentence_labels)))</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>                  current_sentence_tokens <span class="op">=</span> []</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>                  current_sentence_labels <span class="op">=</span> []</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> current_sentence_tokens: <span class="co"># Add last sentence if file doesn't end with a blank line</span></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>            sentences.append(<span class="bu">list</span>(<span class="bu">zip</span>(current_sentence_tokens, current_sentence_labels)))</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> sentences</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>training_sentences <span class="op">=</span> load_conll_lener(<span class="st">"train.conll"</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Loaded </span><span class="sc">{</span><span class="bu">len</span>(training_sentences)<span class="sc">}</span><span class="ss"> sentences from train.conll."</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<pre><code>Loaded 7827 sentences from train.conll.</code></pre>
+<p>Below are some example sentences in BIO format.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Example sentence:"</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">len</span>(training_sentences) <span class="op">&gt;</span> <span class="dv">5</span>:</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> token, label <span class="kw">in</span> training_sentences[<span class="dv">5</span>][<span class="op">-</span><span class="dv">50</span>:]:</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>token<span class="sc">}</span><span class="ch">\t</span><span class="sc">{</span>label<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<pre><code>Example sentence:
+V.v O
+APELAÇÃO    O
+CÍVEL   O
+-   O
+NULIDADE    O
+PROCESSUAL  O
+-   O
+INTIMAÇÃO   O
+DO  O
+MINISTÉRIO  B-ORGANIZACAO
+PÚBLICO I-ORGANIZACAO
+-   O
+INCAPAZ O
+ACOMPANHADA O
+DE  O
+REPRESENTANTE   O
+LEGAL   O
+E   O
+DE  O
+ADVOGADO    O
+-   O
+EXERCÍCIO   O
+DO  O
+CONTRADITÓRIO   O
+E   O
+DA  O
+AMPLA   O
+DEFESA  O
+-   O
+AUSÊNCIA    O
+DE  O
+PREJUÍZOS   O
+-   O
+VÍCIO   O
+AFASTADO    O
+-   O
+IMPROCEDÊNCIA   O
+DO  O
+PEDIDO  O
+-   O
+INEXISTÊNCIA    O
+DE  O
+PROVA   O
+QUANTO  O
+AO  O
+FATO    O
+CONSTITUTIVO    O
+DO  O
+DIREITO O
+.   O</code></pre>
+</section>
+<section id="token-extraction" class="level1">
+<h1>Token Extraction</h1>
+<p>As we saw, the extracted sentences are organized into tuples of tokens and their respective BIO labels. The goal is to extract features for each token from our training sentences using a BERT model via Hugging Face: in this case, neuralmind/bert-large-portuguese-cased. We explicitly define a maximum size of 512, the standard size for the chosen BERT model, to avoid OverflowError.</p>
+<p>The process followed for each sentence is as follows: first, we extract the token texts. Then, we use <code>tokenizer_hf</code> to convert these texts into a format that the BERT model understands, specifying that the input is already divided into words (is_split_into_words=True) and moving the data to the processing device (CPU or GPU). With the inputs ready, we pass them through model_hf to obtain the “hidden states” of the last layer, which are the contextual embeddings for each subword generated by the tokenizer. Since BERT works with subwords, we need to align these embeddings back to our original tokens. For this, we use the word_ids provided by the tokenizer and, for each original token, we calculate the average of the embeddings of its constituent subwords. These mean vectors are then added to our final features_tokens list, numerically representing each word in our corpus.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>hf_model_name <span class="op">=</span> <span class="st">"neuralmind/bert-large-portuguese-cased"</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>tokenizer_hf <span class="op">=</span> AutoTokenizer.from_pretrained(hf_model_name)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>model_hf <span class="op">=</span> AutoModel.from_pretrained(hf_model_name)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<pre><code>tokenizer_config.json:   0%|          | 0.00/155 [00:00&lt;?, ?B/s]
+
+
+
+config.json:   0%|          | 0.00/648 [00:00&lt;?, ?B/s]
+
+
+
+vocab.txt:   0%|          | 0.00/210k [00:00&lt;?, ?B/s]
+
+
+
+added_tokens.json:   0%|          | 0.00/2.00 [00:00&lt;?, ?B/s]
+
+
+
+special_tokens_map.json:   0%|          | 0.00/112 [00:00&lt;?, ?B/s]
+
+
+
+pytorch_model.bin:   0%|          | 0.00/1.34G [00:00&lt;?, ?B/s]</code></pre>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>all_tokens <span class="op">=</span> []</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>all_labels <span class="op">=</span> []</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>ids_sentences<span class="op">=</span> []</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, sentence <span class="kw">in</span> <span class="bu">enumerate</span>(training_sentences):</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> token_text, ner_tag <span class="kw">in</span> sentence:</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    all_tokens.append(token_text)</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    all_labels.append(ner_tag)</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    ids_sentences.append(i)</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Total tokens in the training data: </span><span class="sc">{</span><span class="bu">len</span>(all_tokens)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Unique LeNER-Br labels: </span><span class="sc">{</span><span class="bu">sorted</span>(<span class="bu">list</span>(<span class="bu">set</span>(all_labels)))<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<pre><code>Total tokens in the training data: 229277
+Unique LeNER-Br labels: ['B-JURISPRUDENCIA', 'B-LEGISLACAO', 'B-LOCAL', 'B-ORGANIZACAO', 'B-PESSOA', 'B-TEMPO', 'I-JURISPRUDENCIA', 'I-LEGISLACAO', 'I-LOCAL', 'I-ORGANIZACAO', 'I-PESSOA', 'I-TEMPO', 'O']</code></pre>
+<p>We have a total of 13 unique labels in our dataset. Below is an explanation of the meaning of each one:</p>
+<ul>
+<li><strong><code>B-JURISPRUDENCIA</code></strong>:
+<ul>
+<li><strong>B</strong>: Indicates that this token is the <strong>beginning</strong> of a named entity.</li>
+<li><strong>JURISPRUDENCIA</strong>: Indicates that the named entity is of type “Jurisprudence”. Refers to judicial decisions, rulings, precedents, or any set of interpretations of laws made by courts.</li>
+<li><em>Example</em>: In the text “Conforme o <strong>Acórdão</strong> nº 123…” (According to Ruling No.&nbsp;123…), “Acórdão” could be <code>B-JURISPRUDENCIA</code>.</li>
+</ul></li>
+<li><strong><code>B-LEGISLACAO</code></strong>:
+<ul>
+<li><strong>B</strong>: Beginning of the entity.</li>
+<li><strong>LEGISLACAO</strong>: Indicates that the named entity is of type “Legislation”. Refers to laws, decrees, ordinances, codes, constitutions, etc.</li>
+<li><em>Example</em>: In the text “A <strong>Lei</strong> nº 8.666/93…” (Law No.&nbsp;8.666/93…), “Lei” could be <code>B-LEGISLACAO</code>.</li>
+</ul></li>
+<li><strong><code>B-LOCAL</code></strong>:
+<ul>
+<li><strong>B</strong>: Beginning of the entity.</li>
+<li><strong>LOCAL</strong>: Indicates that the named entity is a “Location”. It can be a city, state, country, address, geographical feature, etc.</li>
+<li><em>Example</em>: In the text “Ele viajou para <strong>Paris</strong>…” (He traveled to Paris…), “Paris” would be <code>B-LOCAL</code>.</li>
+</ul></li>
+<li><strong><code>B-ORGANIZACAO</code></strong>:
+<ul>
+<li><strong>B</strong>: Beginning of the entity.</li>
+<li><strong>ORGANIZACAO</strong>: Indicates that the named entity is an “Organization”. Includes companies, government institutions, NGOs, sports teams, etc.</li>
+<li><em>Example</em>: In the text “O <strong>Google</strong> anunciou…” (Google announced…), “Google” would be <code>B-ORGANIZACAO</code>.</li>
+</ul></li>
+<li><strong><code>B-PESSOA</code></strong>:
+<ul>
+<li><strong>B</strong>: Beginning of the entity.</li>
+<li><strong>PESSOA</strong>: Indicates that the named entity is a “Person”. Refers to names of individuals.</li>
+<li><em>Example</em>: In the text “<strong>Maria</strong> Silva é advogada…” (Maria Silva is a lawyer…), “Maria” would be <code>B-PESSOA</code>.</li>
+</ul></li>
+<li><strong><code>B-TEMPO</code></strong>:
+<ul>
+<li><strong>B</strong>: Beginning of the entity.</li>
+<li><strong>TEMPO</strong>: Indicates that the named entity is a temporal reference. It can be a date, time, specific period (e.g., “21st century”, “next week”).</li>
+<li><em>Example</em>: In the text “A reunião será em <strong>15 de maio</strong>…” (The meeting will be on May 15th…), “15” could be <code>B-TEMPO</code>.</li>
+</ul></li>
+<li><strong><code>I-JURISPRUDENCIA</code></strong>:
+<ul>
+<li><strong>I</strong>: Indicates that this token is <strong>inside</strong> a “Jurisprudence” type entity that has already begun. It is a continuation of the entity.</li>
+<li><em>Example</em>: In the text “…o <strong>Superior Tribunal</strong> de Justiça…” (…the Superior Court of Justice…), if “Superior” was <code>B-JURISPRUDENCIA</code> (or <code>B-ORGANIZACAO</code> depending on the scheme), “Tribunal” could be <code>I-JURISPRUDENCIA</code> (or <code>I-ORGANIZACAO</code>). In the case of a long jurisprudence name, like “Súmula <strong>Vinculante nº</strong> 56” (Binding Precedent No.&nbsp;56), “Vinculante”, “nº”, and “56” would be <code>I-JURISPRUDENCIA</code> if “Súmula” was <code>B-JURISPRUDENCIA</code>.</li>
+</ul></li>
+<li><strong><code>I-LEGISLACAO</code></strong>:
+<ul>
+<li><strong>I</strong>: Inside a “Legislation” type entity.</li>
+<li><em>Example</em>: In the text “A <strong>Lei de Licitações</strong>…” (The Bidding Law…), if “Lei” was <code>B-LEGISLACAO</code>, “de” and “Licitações” would be <code>I-LEGISLACAO</code>.</li>
+</ul></li>
+<li><strong><code>I-LOCAL</code></strong>:
+<ul>
+<li><strong>I</strong>: Inside a “Location” type entity.</li>
+<li><em>Example</em>: In the text “Ele mora em <strong>Nova York</strong>…” (He lives in New York…), if “Nova” was <code>B-LOCAL</code>, “York” would be <code>I-LOCAL</code>.</li>
+</ul></li>
+<li><strong><code>I-ORGANIZACAO</code></strong>:
+<ul>
+<li><strong>I</strong>: Inside an “Organization” type entity.</li>
+<li><em>Example</em>: In the text “O <strong>Banco Central</strong> do Brasil…” (The Central Bank of Brazil…), if “Banco” was <code>B-ORGANIZACAO</code>, “Central” would be <code>I-ORGANIZACAO</code>.</li>
+</ul></li>
+<li><strong><code>I-PESSOA</code></strong>:
+<ul>
+<li><strong>I</strong>: Inside a “Person” type entity.</li>
+<li><em>Example</em>: In the text “<strong>Maria Joaquina</strong> da Silva…”, if “Maria” was <code>B-PESSOA</code>, “Joaquina” would be <code>I-PESSOA</code>.</li>
+</ul></li>
+<li><strong><code>I-TEMPO</code></strong>:
+<ul>
+<li><strong>I</strong>: Inside a “Time” type entity.</li>
+<li><em>Example</em>: In the text “A reunião será em <strong>15 de maio de 2025</strong>…” (The meeting will be on May 15, 2025…), if “15” was <code>B-TEMPO</code>, “de”, “maio”, “de”, and “2025” would be <code>I-TEMPO</code>.</li>
+</ul></li>
+<li><strong><code>O</code></strong>:
+<ul>
+<li><strong>O</strong>: Indicates that the token is <strong>outside</strong> any named entity. It is a common token that is not part of a specific category of interest.</li>
+<li><em>Example</em>: In the text “O gato <strong>sentou</strong> no tapete.” (The cat sat on the carpet.), “sentou” would be <code>O</code>.</li>
+</ul></li>
+</ul>
+<div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>device <span class="op">=</span> torch.device(<span class="st">"cuda"</span> <span class="cf">if</span> torch.cuda.is_available() <span class="cf">else</span> <span class="st">"cpu"</span>)</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Using device: </span><span class="sc">{</span>device<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>EFFECTIVE_MAX_LENGTH <span class="op">=</span> <span class="dv">512</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>model_hf.to(device)</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>model_hf.<span class="bu">eval</span>()</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>features_tokens <span class="op">=</span> []</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i_sent, sentence_data <span class="kw">in</span> <span class="bu">enumerate</span>(training_sentences):</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>    sentence_texts <span class="op">=</span> [token_data[<span class="dv">0</span>] <span class="cf">for</span> token_data <span class="kw">in</span> sentence_data]</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> sentence_texts:</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>    inputs <span class="op">=</span> tokenizer_hf(</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>        sentence_texts,</span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>        is_split_into_words<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>        return_tensors<span class="op">=</span><span class="st">"pt"</span>,</span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>        padding<span class="op">=</span><span class="st">"longest"</span>,</span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>        truncation<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>        max_length<span class="op">=</span>EFFECTIVE_MAX_LENGTH</span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>    ).to(device)</span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>    word_ids <span class="op">=</span> inputs.word_ids()</span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>        outputs <span class="op">=</span> model_hf(<span class="op">**</span>inputs)</span>
+<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>        last_hidden_state <span class="op">=</span> outputs.last_hidden_state</span>
+<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a>    token_subword_embeddings <span class="op">=</span> [[] <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(sentence_texts))]</span>
+<span id="cb15-35"><a href="#cb15-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-36"><a href="#cb15-36" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> subword_idx, original_word_idx <span class="kw">in</span> <span class="bu">enumerate</span>(word_ids):</span>
+<span id="cb15-37"><a href="#cb15-37" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> original_word_idx <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb15-38"><a href="#cb15-38" aria-hidden="true" tabindex="-1"></a>            embedding <span class="op">=</span> last_hidden_state[<span class="dv">0</span>, subword_idx, :]</span>
+<span id="cb15-39"><a href="#cb15-39" aria-hidden="true" tabindex="-1"></a>            token_subword_embeddings[original_word_idx].append(embedding)</span>
+<span id="cb15-40"><a href="#cb15-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-41"><a href="#cb15-41" aria-hidden="true" tabindex="-1"></a>    current_sentence_token_features <span class="op">=</span> []</span>
+<span id="cb15-42"><a href="#cb15-42" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> original_token_idx <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(sentence_texts)):</span>
+<span id="cb15-43"><a href="#cb15-43" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> token_subword_embeddings[original_token_idx]:</span>
+<span id="cb15-44"><a href="#cb15-44" aria-hidden="true" tabindex="-1"></a>            stacked_embeddings <span class="op">=</span> torch.stack(token_subword_embeddings[original_token_idx])</span>
+<span id="cb15-45"><a href="#cb15-45" aria-hidden="true" tabindex="-1"></a>            mean_embedding <span class="op">=</span> torch.mean(stacked_embeddings, dim<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb15-46"><a href="#cb15-46" aria-hidden="true" tabindex="-1"></a>            current_sentence_token_features.append(mean_embedding.cpu().numpy())</span>
+<span id="cb15-47"><a href="#cb15-47" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb15-48"><a href="#cb15-48" aria-hidden="true" tabindex="-1"></a>            current_sentence_token_features.append(np.zeros(model_hf.config.hidden_size))</span>
+<span id="cb15-49"><a href="#cb15-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-50"><a href="#cb15-50" aria-hidden="true" tabindex="-1"></a>    features_tokens.extend(current_sentence_token_features)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<pre><code>Using device: cuda</code></pre>
+<div class="sourceCode" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>features_tokens <span class="op">=</span> np.array(features_tokens)</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Shape of the token features matrix: </span><span class="sc">{</span>features_tokens<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<pre><code>Shape of the token features matrix: (229277, 1024)</code></pre>
+</section>
+<section id="model-training" class="level1">
+<h1>Model Training</h1>
+<p>We need to train a model for use with the cleanlab library. Initially, the NER labels are transformed using LabelEncoder, which converts the labels into numbers for use in the chosen model.</p>
+<p>In the actual training of our model, we divide our dataset (<code>features_tokens</code> and <code>labels_ner_codificados</code>) into two parts: one for training (<code>X_treino</code>,<code>y_treino</code>) and another for testing (<code>X_teste</code>, <code>y_teste</code>). We use 25% of the data for the test set and ensure that the proportion of different NER label classes is maintained in both splits, thanks to the stratify parameter. Next, we prepare an array called <code>probabilidades_preditas_teste</code>, which will store the probabilities of each class that our model will assign to the examples in the test set.</p>
+<p>Then, we define and train our classification model. We opted for an SGDClassifier (Stochastic Gradient Descent Classifier). It works by adjusting the parameters of a linear model (in this case, configured to behave like a Logistic Regression using loss=‘log_loss’) iteratively, processing one sample at a time, making it fast and scalable. After training the model, we use it to predict the class probabilities for the <code>X_teste</code> set, storing them in <code>probabilidades_preditas_teste</code>. Finally, we also calculate and display the model’s accuracy on this test set, comparing the predictions with the true y_teste labels.</p>
+<p>A KFold strategy with 5 folds was used to go through the entire dataset separately and independently to obtain out-of-sample predictions for every instance.</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>label_encoder <span class="op">=</span> LabelEncoder()</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>ner_labels_encoded <span class="op">=</span> label_encoder.fit_transform(all_labels)</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>num_classes <span class="op">=</span> <span class="bu">len</span>(label_encoder.classes_)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="issues-found-with-the-dataset" class="level1">
+<h1>Issues Found with the Dataset</h1>
+<p>Now we delve into the actual application of confident learning techniques. Initially, we use the <code>find_label_issues</code> function from the cleanlab library to identify potentially mislabeled tokens in our NER dataset. We pass the encoded labels (<code>ner_labels_encoded</code>) and the model’s predicted probabilities (<code>predicted_probabilities</code>) as input.</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>skf <span class="op">=</span> StratifiedKFold(n_splits<span class="op">=</span>NUM_FOLDS_CV, shuffle<span class="op">=</span><span class="va">True</span>, random_state<span class="op">=</span>RANDOM_SEED)</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>predicted_probabilities <span class="op">=</span> np.zeros((<span class="bu">len</span>(features_tokens), num_classes))</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Starting </span><span class="sc">{</span>NUM_FOLDS_CV<span class="sc">}</span><span class="ss">-fold cross-validation"</span>)</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> fold_index, (train_indices, validation_indices) <span class="kw">in</span> <span class="bu">enumerate</span>(skf.split(features_tokens, ner_labels_encoded)):</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Processing Fold </span><span class="sc">{</span>fold_index <span class="op">+</span> <span class="dv">1</span><span class="sc">}</span><span class="ss">/</span><span class="sc">{</span>NUM_FOLDS_CV<span class="sc">}</span><span class="ss">..."</span>)</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>    X_train, X_validation <span class="op">=</span> features_tokens[train_indices], features_tokens[validation_indices]</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>    y_train, y_validation <span class="op">=</span> ner_labels_encoded[train_indices], ner_labels_encoded[validation_indices]</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> SGDClassifier(</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>            loss<span class="op">=</span><span class="st">'log_loss'</span>,</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>            penalty<span class="op">=</span><span class="st">'l2'</span>,</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>            alpha<span class="op">=</span><span class="fl">0.0001</span>,</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>            max_iter<span class="op">=</span><span class="dv">1000</span>,</span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>            tol<span class="op">=</span><span class="fl">1e-3</span>,</span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a>            random_state<span class="op">=</span>RANDOM_SEED,</span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a>            class_weight<span class="op">=</span><span class="st">'balanced'</span>,</span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a>            learning_rate<span class="op">=</span><span class="st">'optimal'</span>,</span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>            early_stopping<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a>            n_iter_no_change<span class="op">=</span><span class="dv">10</span>,</span>
+<span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a>            validation_fraction<span class="op">=</span><span class="fl">0.1</span></span>
+<span id="cb20-22"><a href="#cb20-22" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb20-23"><a href="#cb20-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-24"><a href="#cb20-24" aria-hidden="true" tabindex="-1"></a>    model.fit(X_train, y_train)</span>
+<span id="cb20-25"><a href="#cb20-25" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"Model trained."</span>)</span>
+<span id="cb20-26"><a href="#cb20-26" aria-hidden="true" tabindex="-1"></a>    fold_predicted_probabilities <span class="op">=</span> model.predict_proba(X_validation)</span>
+<span id="cb20-27"><a href="#cb20-27" aria-hidden="true" tabindex="-1"></a>    predicted_probabilities[validation_indices] <span class="op">=</span> fold_predicted_probabilities</span>
+<span id="cb20-28"><a href="#cb20-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-29"><a href="#cb20-29" aria-hidden="true" tabindex="-1"></a>    fold_predictions <span class="op">=</span> model.predict(X_validation)</span>
+<span id="cb20-30"><a href="#cb20-30" aria-hidden="true" tabindex="-1"></a>    fold_accuracy <span class="op">=</span> accuracy_score(y_validation, fold_predictions)</span>
+<span id="cb20-31"><a href="#cb20-31" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"    Fold </span><span class="sc">{</span>fold_index <span class="op">+</span> <span class="dv">1</span><span class="sc">}</span><span class="ss"> Accuracy: </span><span class="sc">{</span>fold_accuracy<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb20-32"><a href="#cb20-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-33"><a href="#cb20-33" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Collection of out-of-sample predicted probabilities finished."</span>)</span>
+<span id="cb20-34"><a href="#cb20-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Shape of the predicted probabilities matrix: </span><span class="sc">{</span>predicted_probabilities<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<pre><code>Starting 5-fold cross-validation
+  Processing Fold 1/5...
+Model trained.
+    Fold 1 Accuracy: 0.9680
+  Processing Fold 2/5...
+Model trained.
+    Fold 2 Accuracy: 0.9734
+  Processing Fold 3/5...
+Model trained.
+    Fold 3 Accuracy: 0.9696
+  Processing Fold 4/5...
+Model trained.
+    Fold 4 Accuracy: 0.9720
+  Processing Fold 5/5...
+Model trained.
+    Fold 5 Accuracy: 0.9719
+
+Collection of out-of-sample predicted probabilities finished.
+Shape of the predicted probabilities matrix: (229277, 13)</code></pre>
+<div class="sourceCode" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Identifying labeling issues with cleanlab..."</span>)</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>label_issue_indices <span class="op">=</span> find_label_issues(</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>        labels<span class="op">=</span>ner_labels_encoded,</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>        pred_probs<span class="op">=</span>predicted_probabilities,</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>        return_indices_ranked_by<span class="op">=</span><span class="st">'self_confidence'</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>num_issues_found <span class="op">=</span> <span class="bu">len</span>(label_issue_indices)</span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Cleanlab identified </span><span class="sc">{</span>num_issues_found<span class="sc">}</span><span class="ss"> potential labeling issues."</span>)</span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>percentage_issues <span class="op">=</span> (num_issues_found <span class="op">/</span> <span class="bu">len</span>(all_tokens)) <span class="op">*</span> <span class="dv">100</span></span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"This represents </span><span class="sc">{</span>percentage_issues<span class="sc">:.2f}</span><span class="ss">% of the total tokens."</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<pre><code>Identifying labeling issues with cleanlab...
+Cleanlab identified 2326 potential labeling issues.
+This represents 1.01% of the total tokens.</code></pre>
+<p>Next, we iterate through the indices of tokens that have potential annotation errors in the NER dataset, comparing the original labels with the model’s suggested labels. For each token identified as problematic, we retrieve the token and its label, and transform it to its textual form using the label_encoder (method <code>inverse_transform</code>).</p>
+<p>Then, we identify the label predicted by the model with the highest probability and also decode it. We calculate the model’s confidence in the original label and retrieve the identifier of the sentence to which the token belongs. Finally, we gather all this information into a list of <code>dicts</code> (<code>issues_for_review</code>).</p>
+<p>The stored <code>dict</code> has the following fields that will be useful for our subsequent analysis:</p>
+<ul>
+<li><code>global_token_index</code>: position of the token in our list of all tokens in our dataset</li>
+<li><code>sentence_id</code>: identifier of the problematic sentence</li>
+<li><code>original_label</code>: the label associated with the token in the dataset</li>
+<li><code>model_suggested_label</code>: the label our model suggests for the token</li>
+<li><code>model_confidence_in_original_label</code>: the probability the model assigns to the original label. Low values mean our model is not very confident that the original label is correct.</li>
+<li><code>full_sentence_context</code>: complete sentence where the problematic token was found. It will be used to visualize the problems that will be addressed in a later step.</li>
+</ul>
+<div class="sourceCode" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>issues_for_review <span class="op">=</span> []</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> global_token_index <span class="kw">in</span> label_issue_indices:</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    original_token <span class="op">=</span> all_tokens[global_token_index]</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    original_label_encoded <span class="op">=</span> ner_labels_encoded[global_token_index]</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>    original_label_str <span class="op">=</span> label_encoder.inverse_transform([original_label_encoded])[<span class="dv">0</span>]</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>    predicted_label_encoded <span class="op">=</span> np.argmax(predicted_probabilities[global_token_index])</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>    predicted_label_str <span class="op">=</span> label_encoder.inverse_transform([predicted_label_encoded])[<span class="dv">0</span>]</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>    confidence_in_original <span class="op">=</span> predicted_probabilities[global_token_index, original_label_encoded]</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>    sent_id <span class="op">=</span> ids_sentences[global_token_index]</span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>    issues_for_review.append({</span>
+<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>        <span class="st">"global_token_index"</span>: global_token_index,</span>
+<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>        <span class="st">"sentence_id"</span>: sent_id,</span>
+<span id="cb24-16"><a href="#cb24-16" aria-hidden="true" tabindex="-1"></a>        <span class="st">"token"</span>: original_token,</span>
+<span id="cb24-17"><a href="#cb24-17" aria-hidden="true" tabindex="-1"></a>        <span class="st">"original_label"</span>: original_label_str,</span>
+<span id="cb24-18"><a href="#cb24-18" aria-hidden="true" tabindex="-1"></a>        <span class="st">"model_suggested_label"</span>: predicted_label_str,</span>
+<span id="cb24-19"><a href="#cb24-19" aria-hidden="true" tabindex="-1"></a>        <span class="st">"model_confidence_in_original_label"</span>: confidence_in_original,</span>
+<span id="cb24-20"><a href="#cb24-20" aria-hidden="true" tabindex="-1"></a>        <span class="st">"full_sentence_context"</span>: training_sentences[sent_id]</span>
+<span id="cb24-21"><a href="#cb24-21" aria-hidden="true" tabindex="-1"></a>    })</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>We sort the issues by the lowest model confidence in the originally provided labels and then we visualize the issues found. In the following loop, we have the 20 issues with the lowest model confidence in the original label, i.e., highest distrust.</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>sorted_issues_for_review <span class="op">=</span> <span class="bu">sorted</span>(issues_for_review, key<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">'model_confidence_in_original_label'</span>])</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, issue <span class="kw">in</span> <span class="bu">enumerate</span>(sorted_issues_for_review[:<span class="bu">min</span>(<span class="dv">20</span>, num_issues_found)]):</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Problem #</span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> (Global Token Index: </span><span class="sc">{</span>issue[<span class="st">'global_token_index'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Sentence ID: </span><span class="sc">{</span>issue[<span class="st">'sentence_id'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Token: '</span><span class="sc">{</span>issue[<span class="st">'token'</span>]<span class="sc">}</span><span class="ss">'"</span>)</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Original Label: </span><span class="sc">{</span>issue[<span class="st">'original_label'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Model Suggested Label: </span><span class="sc">{</span>issue[<span class="st">'model_suggested_label'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Model Confidence in Original Label: </span><span class="sc">{</span>issue[<span class="st">'model_confidence_in_original_label'</span>]<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>    sentence_tokens_tags <span class="op">=</span> issue[<span class="st">'full_sentence_context'</span>]</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>    first_token_index_in_global_dataset <span class="op">=</span> <span class="op">-</span><span class="dv">1</span></span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> global_idx, global_sent_id <span class="kw">in</span> <span class="bu">enumerate</span>(ids_sentences):</span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> global_sent_id <span class="op">==</span> issue[<span class="st">'sentence_id'</span>]:</span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>            first_token_index_in_global_dataset <span class="op">=</span> global_idx</span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a>            <span class="cf">break</span></span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>    token_position_in_sentence <span class="op">=</span> issue[<span class="st">'global_token_index'</span>] <span class="op">-</span> first_token_index_in_global_dataset</span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> (<span class="dv">0</span> <span class="op">&lt;=</span> token_position_in_sentence <span class="op">&lt;</span> <span class="bu">len</span>(sentence_tokens_tags)) <span class="kw">or</span> <span class="op">\</span></span>
+<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a>       sentence_tokens_tags[token_position_in_sentence][<span class="dv">0</span>] <span class="op">!=</span> issue[<span class="st">'token'</span>]:</span>
+<span id="cb25-23"><a href="#cb25-23" aria-hidden="true" tabindex="-1"></a>        found_in_fallback <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb25-24"><a href="#cb25-24" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> sent_idx, (sent_tk, _) <span class="kw">in</span> <span class="bu">enumerate</span>(sentence_tokens_tags):</span>
+<span id="cb25-25"><a href="#cb25-25" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> sent_tk <span class="op">==</span> issue[<span class="st">'token'</span>]:</span>
+<span id="cb25-26"><a href="#cb25-26" aria-hidden="true" tabindex="-1"></a>                token_position_in_sentence <span class="op">=</span> sent_idx</span>
+<span id="cb25-27"><a href="#cb25-27" aria-hidden="true" tabindex="-1"></a>                found_in_fallback <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb25-28"><a href="#cb25-28" aria-hidden="true" tabindex="-1"></a>                <span class="cf">break</span></span>
+<span id="cb25-29"><a href="#cb25-29" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> found_in_fallback:</span>
+<span id="cb25-30"><a href="#cb25-30" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"  WARNING: Could not reliably determine token position for context display for token '</span><span class="sc">{</span>issue[<span class="st">'token'</span>]<span class="sc">}</span><span class="ss">'."</span>)</span>
+<span id="cb25-31"><a href="#cb25-31" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="cb25-32"><a href="#cb25-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-33"><a href="#cb25-33" aria-hidden="true" tabindex="-1"></a>    context_window <span class="op">=</span> <span class="dv">10</span></span>
+<span id="cb25-34"><a href="#cb25-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-35"><a href="#cb25-35" aria-hidden="true" tabindex="-1"></a>    prev_ctx_start <span class="op">=</span> <span class="bu">max</span>(<span class="dv">0</span>, token_position_in_sentence <span class="op">-</span> context_window)</span>
+<span id="cb25-36"><a href="#cb25-36" aria-hidden="true" tabindex="-1"></a>    previous_context_data <span class="op">=</span> sentence_tokens_tags[prev_ctx_start : token_position_in_sentence]</span>
+<span id="cb25-37"><a href="#cb25-37" aria-hidden="true" tabindex="-1"></a>    formatted_previous_context <span class="op">=</span> [<span class="ss">f"</span><span class="sc">{</span>tk<span class="sc">}</span><span class="ss">(</span><span class="sc">{</span>tag<span class="sc">}</span><span class="ss">)"</span> <span class="cf">for</span> tk, tag <span class="kw">in</span> previous_context_data]</span>
+<span id="cb25-38"><a href="#cb25-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-39"><a href="#cb25-39" aria-hidden="true" tabindex="-1"></a>    problematic_token_text <span class="op">=</span> issue[<span class="st">'token'</span>]</span>
+<span id="cb25-40"><a href="#cb25-40" aria-hidden="true" tabindex="-1"></a>    problematic_original_label <span class="op">=</span> issue[<span class="st">'original_label'</span>]</span>
+<span id="cb25-41"><a href="#cb25-41" aria-hidden="true" tabindex="-1"></a>    problematic_suggested_label <span class="op">=</span> issue[<span class="st">'model_suggested_label'</span>]</span>
+<span id="cb25-42"><a href="#cb25-42" aria-hidden="true" tabindex="-1"></a>    highlighted_token_str <span class="op">=</span> <span class="ss">f"**</span><span class="sc">{</span>problematic_token_text<span class="sc">}</span><span class="ss">**(Original:</span><span class="sc">{</span>problematic_original_label<span class="sc">}</span><span class="ss">|Suggested:</span><span class="sc">{</span>problematic_suggested_label<span class="sc">}</span><span class="ss">)**"</span></span>
+<span id="cb25-43"><a href="#cb25-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-44"><a href="#cb25-44" aria-hidden="true" tabindex="-1"></a>    post_ctx_start <span class="op">=</span> token_position_in_sentence <span class="op">+</span> <span class="dv">1</span></span>
+<span id="cb25-45"><a href="#cb25-45" aria-hidden="true" tabindex="-1"></a>    post_ctx_end <span class="op">=</span> <span class="bu">min</span>(<span class="bu">len</span>(sentence_tokens_tags), post_ctx_start <span class="op">+</span> context_window)</span>
+<span id="cb25-46"><a href="#cb25-46" aria-hidden="true" tabindex="-1"></a>    subsequent_context_data <span class="op">=</span> sentence_tokens_tags[post_ctx_start : post_ctx_end]</span>
+<span id="cb25-47"><a href="#cb25-47" aria-hidden="true" tabindex="-1"></a>    formatted_subsequent_context <span class="op">=</span> [<span class="ss">f"</span><span class="sc">{</span>tk<span class="sc">}</span><span class="ss">(</span><span class="sc">{</span>tag<span class="sc">}</span><span class="ss">)"</span> <span class="cf">for</span> tk, tag <span class="kw">in</span> subsequent_context_data]</span>
+<span id="cb25-48"><a href="#cb25-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-49"><a href="#cb25-49" aria-hidden="true" tabindex="-1"></a>    final_context_parts <span class="op">=</span> []</span>
+<span id="cb25-50"><a href="#cb25-50" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> formatted_previous_context:</span>
+<span id="cb25-51"><a href="#cb25-51" aria-hidden="true" tabindex="-1"></a>        final_context_parts.append(<span class="st">" "</span>.join(formatted_previous_context))</span>
+<span id="cb25-52"><a href="#cb25-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-53"><a href="#cb25-53" aria-hidden="true" tabindex="-1"></a>    final_context_parts.append(highlighted_token_str)</span>
+<span id="cb25-54"><a href="#cb25-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-55"><a href="#cb25-55" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> formatted_subsequent_context:</span>
+<span id="cb25-56"><a href="#cb25-56" aria-hidden="true" tabindex="-1"></a>        final_context_parts.append(<span class="st">" "</span>.join(formatted_subsequent_context))</span>
+<span id="cb25-57"><a href="#cb25-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-58"><a href="#cb25-58" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Context (±</span><span class="sc">{</span>context_window<span class="sc">}</span><span class="ss"> words): </span><span class="sc">{</span><span class="st">' '</span><span class="sc">.</span>join(final_context_parts)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb25-59"><a href="#cb25-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-60"><a href="#cb25-60" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">End of issue display."</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<pre><code>Problem #1 (Global Token Index: 138519)
+  Sentence ID: 4905
+  Token: 'artigo'
+  Original Label: B-LOCAL
+  Model Suggested Label: B-LEGISLACAO
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): Logo(O) ,(O) tem-se(O) que(O) o(O) **artigo**(Original:B-LOCAL|Suggested:B-LEGISLACAO)** 276(I-LOCAL) do(I-LOCAL) Decreto(I-LOCAL) nº(I-LOCAL) 3.048/99(I-LOCAL) especificamente(O) fixa(O) o(O) dia(O) dois(O)
+
+Problem #2 (Global Token Index: 122878)
+  Sentence ID: 4323
+  Token: 'Autos'
+  Original Label: B-LOCAL
+  Model Suggested Label: B-JURISPRUDENCIA
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): 68(O) 3302-0444/0445(O) ,(O) Rio(B-LOCAL) Branco-AC(I-LOCAL) -(O) Mod(O) .(O) 500258(O) -(O) **Autos**(Original:B-LOCAL|Suggested:B-JURISPRUDENCIA)** n.º(I-LOCAL) 1002199-81.2017.8.01.0000/50000(I-LOCAL) ARAÚJO(O) ,(O) QUARTA(B-ORGANIZACAO) TURMA(I-ORGANIZACAO) ,(O) julgado(O) em(O) 09/05/2017(B-TEMPO)
+
+Problem #3 (Global Token Index: 33548)
+  Sentence ID: 1067
+  Token: ','
+  Original Label: I-LOCAL
+  Model Suggested Label: O
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): CONSTRUÇÃO(O) E(O) ALTERA(O) O(O) USO(O) DE(O) LOTES(O) NA(O) QUADRA(B-LOCAL) 1(I-LOCAL) **,**(Original:I-LOCAL|Suggested:O)** DO(I-LOCAL) SETOR(I-LOCAL) DE(I-LOCAL) INDÚSTRIAS(I-LOCAL) GRÁFICAS(I-LOCAL) ,(O) NA(O) REGIÃO(B-LOCAL) ADMINISTRATIVA(I-LOCAL) DO(I-LOCAL)
+
+Problem #4 (Global Token Index: 122879)
+  Sentence ID: 4323
+  Token: 'n.º'
+  Original Label: I-LOCAL
+  Model Suggested Label: I-JURISPRUDENCIA
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): 3302-0444/0445(O) ,(O) Rio(B-LOCAL) Branco-AC(I-LOCAL) -(O) Mod(O) .(O) 500258(O) -(O) Autos(B-LOCAL) **n.º**(Original:I-LOCAL|Suggested:I-JURISPRUDENCIA)** 1002199-81.2017.8.01.0000/50000(I-LOCAL) ARAÚJO(O) ,(O) QUARTA(B-ORGANIZACAO) TURMA(I-ORGANIZACAO) ,(O) julgado(O) em(O) 09/05/2017(B-TEMPO) ,(O)
+
+Problem #5 (Global Token Index: 56502)
+  Sentence ID: 1863
+  Token: 'TAPE'
+  Original Label: B-LOCAL
+  Model Suggested Label: O
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): COMPROMISSO(O) É(O) COM(O) A(O) VERDADE(O) POR(O) ISSO(O) O(O) PSDB(B-ORGANIZACAO) 1(O) **TAPE**(Original:B-LOCAL|Suggested:O)** VI(I-LOCAL) APOIA(O) IGOR(B-PESSOA) E(O) TECO(B-PESSOA) .(O)
+
+Problem #6 (Global Token Index: 138520)
+  Sentence ID: 4905
+  Token: '276'
+  Original Label: I-LOCAL
+  Model Suggested Label: I-LEGISLACAO
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): Logo(O) ,(O) tem-se(O) que(O) o(O) artigo(B-LOCAL) **276**(Original:I-LOCAL|Suggested:I-LEGISLACAO)** do(I-LOCAL) Decreto(I-LOCAL) nº(I-LOCAL) 3.048/99(I-LOCAL) especificamente(O) fixa(O) o(O) dia(O) dois(O) do(O)
+
+Problem #7 (Global Token Index: 173708)
+  Sentence ID: 6020
+  Token: 'Penal'
+  Original Label: I-TEMPO
+  Model Suggested Label: I-LEGISLACAO
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): 2.848(I-LEGISLACAO) ,(O) de(O) 7(B-TEMPO) de(I-TEMPO) dezembro(I-TEMPO) de(I-TEMPO) 1940(I-TEMPO) ((O) Código(B-TEMPO) **Penal**(Original:I-TEMPO|Suggested:I-LEGISLACAO)** )(O) ,(O) passa(O) a(O) vigorar(O) com(O) as(O) seguintes(O) alterações(O) :(O)
+
+Problem #8 (Global Token Index: 45419)
+  Sentence ID: 1482
+  Token: 'única'
+  Original Label: I-LOCAL
+  Model Suggested Label: I-ORGANIZACAO
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): fls(O) .(O) 23-TJ(O) pelo(O) douto(O) Juiz(O) de(O) Direito(O) da(O) Vara(B-LOCAL) **única**(Original:I-LOCAL|Suggested:I-ORGANIZACAO)** da(I-LOCAL) Comarca(I-LOCAL) de(I-LOCAL) Santa(I-LOCAL) Maria(I-LOCAL) do(I-LOCAL) Suaçuí/MG(I-LOCAL) ,(O) que(O) indeferiu(O)
+
+Problem #9 (Global Token Index: 122880)
+  Sentence ID: 4323
+  Token: '1002199-81.2017.8.01.0000/50000'
+  Original Label: I-LOCAL
+  Model Suggested Label: I-JURISPRUDENCIA
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): ,(O) Rio(B-LOCAL) Branco-AC(I-LOCAL) -(O) Mod(O) .(O) 500258(O) -(O) Autos(B-LOCAL) n.º(I-LOCAL) **1002199-81.2017.8.01.0000/50000**(Original:I-LOCAL|Suggested:I-JURISPRUDENCIA)** ARAÚJO(O) ,(O) QUARTA(B-ORGANIZACAO) TURMA(I-ORGANIZACAO) ,(O) julgado(O) em(O) 09/05/2017(B-TEMPO) ,(O) DJe(O)
+
+Problem #10 (Global Token Index: 28356)
+  Sentence ID: 943
+  Token: 'Estrada'
+  Original Label: I-LOCAL
+  Model Suggested Label: B-LOCAL
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): conformidade(O) com(O) as(O) seguintes(O) especificações(O) :(O) I(O) localização(O) :(O) DF-001(B-LOCAL) **Estrada**(Original:I-LOCAL|Suggested:B-LOCAL)** Parque(I-LOCAL) Contorno(I-LOCAL) EPCT(I-LOCAL) ,(O) km(O) 12,8(O) ,(O) na(O) Região(B-LOCAL) Administrativa(I-LOCAL)
+
+Problem #11 (Global Token Index: 57701)
+  Sentence ID: 1912
+  Token: 'Ceará'
+  Original Label: B-LOCAL
+  Model Suggested Label: I-ORGANIZACAO
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): ementas(O) de(O) julgados(O) dos(O) TREs(O) de(O) Minas(B-LOCAL) Gerais(I-LOCAL) e(O) do(O) **Ceará**(Original:B-LOCAL|Suggested:I-ORGANIZACAO)** .(O)
+
+Problem #12 (Global Token Index: 54465)
+  Sentence ID: 1795
+  Token: '27/02/2015'
+  Original Label: B-PESSOA
+  Model Suggested Label: B-TEMPO
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): MOURA(I-PESSOA) ,(O) SEXTA(B-ORGANIZACAO) TURMA(I-ORGANIZACAO) ,(O) julgado(O) em(O) 09/12/2014(B-TEMPO) ,(O) DJe(O) **27/02/2015**(Original:B-PESSOA|Suggested:B-TEMPO)** ;(O) HC(B-JURISPRUDENCIA) 312.391/SP(I-JURISPRUDENCIA) ,(O) Rel(O) .(O) Ministro(O) FELIX(B-PESSOA) FISCHER(I-PESSOA) ,(O)
+
+Problem #13 (Global Token Index: 96444)
+  Sentence ID: 3240
+  Token: 'artigo'
+  Original Label: B-ORGANIZACAO
+  Model Suggested Label: B-LEGISLACAO
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): não(O) concretização(O) ,(O) pelo(O) paciente(O) ,(O) do(O) tipo(O) previsto(O) no(O) **artigo**(Original:B-ORGANIZACAO|Suggested:B-LEGISLACAO)** 187(I-ORGANIZACAO) do(I-ORGANIZACAO) Código(I-ORGANIZACAO) Penal(I-ORGANIZACAO) Militar(I-ORGANIZACAO) -(O) Crime(O) de(O) Deserção(O) -(O)
+
+Problem #14 (Global Token Index: 9642)
+  Sentence ID: 341
+  Token: 'período'
+  Original Label: B-TEMPO
+  Model Suggested Label: O
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): $(O) 30.000,00(O) ((O) trinta(O) mil(O) reais(O) )(O) ,(O) alusivos(O) o(O) **período**(Original:B-TEMPO|Suggested:O)** de(I-TEMPO) maio(I-TEMPO) a(I-TEMPO) novembro(I-TEMPO) de(I-TEMPO) 2014(I-TEMPO) ;(O) c(O) )(O) R(O)
+
+Problem #15 (Global Token Index: 33464)
+  Sentence ID: 1066
+  Token: 'Federal.Por'
+  Original Label: I-LOCAL
+  Model Suggested Label: O
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): iniciativa(O) do(O) processo(O) legislativo(O) compete(O) privativamente(O) ao(O) Governador(O) do(O) Distrito(B-LOCAL) **Federal.Por**(Original:I-LOCAL|Suggested:O)** isso(O) mesmo(O) ,(O) demonstrado(O) que(O) a(O) iniciativa(O) das(O) leis(O) distritais(O)
+
+Problem #16 (Global Token Index: 84104)
+  Sentence ID: 2801
+  Token: 'Porta-Aviões'
+  Original Label: B-LOCAL
+  Model Suggested Label: I-LOCAL
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): ((O) ...(O) )(O) que(O) conheceu(O) o(O) Acusado(O) quando(O) serviu(O) no(O) **Porta-Aviões**(Original:B-LOCAL|Suggested:I-LOCAL)** São(I-LOCAL) Paulo(I-LOCAL) ;(O) ((O) ...(O) )(O) que(O) o(O) endereço(O) do(O)
+
+Problem #17 (Global Token Index: 138521)
+  Sentence ID: 4905
+  Token: 'do'
+  Original Label: I-LOCAL
+  Model Suggested Label: I-LEGISLACAO
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): Logo(O) ,(O) tem-se(O) que(O) o(O) artigo(B-LOCAL) 276(I-LOCAL) **do**(Original:I-LOCAL|Suggested:I-LEGISLACAO)** Decreto(I-LOCAL) nº(I-LOCAL) 3.048/99(I-LOCAL) especificamente(O) fixa(O) o(O) dia(O) dois(O) do(O) mês(O)
+
+Problem #18 (Global Token Index: 181082)
+  Sentence ID: 6176
+  Token: 'Automóvel'
+  Original Label: I-LOCAL
+  Model Suggested Label: B-LOCAL
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): -(O) São(B-LOCAL) Sebastião(I-LOCAL) ;(O) XXVII(O) -(O) SCIA(B-LOCAL) ((O) Cidade(B-LOCAL) do(I-LOCAL) **Automóvel**(Original:I-LOCAL|Suggested:B-LOCAL)** e(O) Estrutural(B-LOCAL) )(O) ;(O) XXVIII(O) -(O) SIA(B-LOCAL) e(O) Setores(O) Complementares(O)
+
+Problem #19 (Global Token Index: 45418)
+  Sentence ID: 1482
+  Token: 'Vara'
+  Original Label: B-LOCAL
+  Model Suggested Label: I-ORGANIZACAO
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): às(O) fls(O) .(O) 23-TJ(O) pelo(O) douto(O) Juiz(O) de(O) Direito(O) da(O) **Vara**(Original:B-LOCAL|Suggested:I-ORGANIZACAO)** única(I-LOCAL) da(I-LOCAL) Comarca(I-LOCAL) de(I-LOCAL) Santa(I-LOCAL) Maria(I-LOCAL) do(I-LOCAL) Suaçuí/MG(I-LOCAL) ,(O) que(O)
+
+Problem #20 (Global Token Index: 9667)
+  Sentence ID: 341
+  Token: 'período'
+  Original Label: B-TEMPO
+  Model Suggested Label: O
+  Model Confidence in Original Label: 0.0000
+  Context (±10 words): e(O) cinco(O) mil(O) reais(O) )(O) por(O) cada(O) mês(O) referente(O) ao(O) **período**(Original:B-TEMPO|Suggested:O)** de(I-TEMPO) novembro(I-TEMPO) de(I-TEMPO) 2014(I-TEMPO) outubro(I-TEMPO) de(I-TEMPO) 2015(I-TEMPO) ((O) data(O) da(O)
+
+End of issue display.</code></pre>
+<p>At this point, we analyze the output of our confident learning model. We see that in the first identified problems, the model correctly pointed out errors in human annotation. Problems #1 and #2 are clearly examples of erroneously registered legislation: **artigo**(Original:B-LOCAL|Suggested:B-LEGISLACAO)** 276(I-LOCAL) and **Autos**(Original:B-LOCAL|Suggested:B-JURISPRUDENCIA)** n.º(I-LOCAL) 1002199-81.2017.8.01.0000/50000(I-LOCAL).</p>
+<p>However, there are examples where our model was confused in pointing out problems in original labels. In problem #3, the comma in the address QUADRA(B-LOCAL) 1(I-LOCAL) ** , **(Original:I-LOCAL|Suggested:O)** DO(I-LOCAL) SETOR(I-LOCAL) DE(I-LOCAL) INDÚSTRIAS(I-LOCAL) GRÁFICAS(I-LOCAL) should, in fact, be considered part of the LOCAL label.</p>
+<p>Despite the example of the model’s mistake, its efficiency in identifying problematic labels is noticeable, attesting to the effectiveness of the applied technique.</p>
+</section>
+<section id="conclusion" class="level1">
+<h1>Conclusion</h1>
+<p>In this notebook, we applied Confident Learning techniques using the cleanlab library to detect annotation errors in the LeNER-Br dataset, widely used in Named Entity Recognition (NER) tasks in the Portuguese language.</p>
+<p>We automatically identified several inconsistent labels between human annotations and the trained model’s predictions, based on low confidence criteria. It was observed that many of the errors pointed out by the model indeed indicated labeling flaws in the original set, such as the mistaken annotation of legal expressions and jurisprudence names as locations.</p>
+<p>Although some false positives were identified — such as the case of the comma in the address incorrectly classified by the model — the results demonstrate the relevance of the technique for auditing and refining manually annotated datasets.</p>
+<p>We conclude that the use of Confident Learning represents an effective approach for improving the quality of annotated datasets, especially in sensitive tasks like legal NER, where annotation errors can significantly impact model performance.</p>
+<p>As a future step, the application of automated or semi-automated retagging techniques is recommended to correct the labels identified as problematic, using the model’s highest confidence predictions as an initial suggestion for human review.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

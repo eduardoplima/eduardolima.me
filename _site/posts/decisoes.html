@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.31">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Eduardo P. Lima">
+<meta name="dcterms.date" content="2021-01-22">
+<meta name="description" content="This post demonstrates a hybrid pipeline with regular expressions and LLMs to extract fines, reimbursements, and recommendations from Brazilian audit court decisions.">
+
+<title>Using LLMs to Extract Legal Entities from Audit Court Decisions – Eduardo P. Lima</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e1a5c8363afafaef2c763b6775fbf3ca.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-494f656f63d1238b366f4e6b61f952ab.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Eduardo P. Lima</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#using-llms-for-analyzing-decisions-of-the-state-audit-court-of-rio-grande-do-norte" id="toc-using-llms-for-analyzing-decisions-of-the-state-audit-court-of-rio-grande-do-norte" class="nav-link active" data-scroll-target="#using-llms-for-analyzing-decisions-of-the-state-audit-court-of-rio-grande-do-norte">Using LLMs for Analyzing Decisions of the State Audit Court of Rio Grande do Norte</a></li>
+  <li><a href="#environment-setup" id="toc-environment-setup" class="nav-link" data-scroll-target="#environment-setup">Environment Setup</a></li>
+  <li><a href="#file-preparation" id="toc-file-preparation" class="nav-link" data-scroll-target="#file-preparation">File Preparation</a></li>
+  <li><a href="#dataset-loading" id="toc-dataset-loading" class="nav-link" data-scroll-target="#dataset-loading">Dataset Loading</a></li>
+  <li><a href="#initial-exploration" id="toc-initial-exploration" class="nav-link" data-scroll-target="#initial-exploration">Initial Exploration</a></li>
+  <li><a href="#manual-rules-for-ner" id="toc-manual-rules-for-ner" class="nav-link" data-scroll-target="#manual-rules-for-ner">Manual Rules for NER</a></li>
+  <li><a href="#cleaned-entity-extraction" id="toc-cleaned-entity-extraction" class="nav-link" data-scroll-target="#cleaned-entity-extraction">Cleaned Entity Extraction</a></li>
+  <li><a href="#entity-types-fines-and-sanctions" id="toc-entity-types-fines-and-sanctions" class="nav-link" data-scroll-target="#entity-types-fines-and-sanctions">Entity Types: Fines and Sanctions</a></li>
+  <li><a href="#entity-types-recommendations-and-obligations" id="toc-entity-types-recommendations-and-obligations" class="nav-link" data-scroll-target="#entity-types-recommendations-and-obligations">Entity Types: Recommendations and Obligations</a></li>
+  <li><a href="#structured-output-example" id="toc-structured-output-example" class="nav-link" data-scroll-target="#structured-output-example">Structured Output Example</a></li>
+  <li><a href="#using-langchain-for-llm-integration" id="toc-using-langchain-for-llm-integration" class="nav-link" data-scroll-target="#using-langchain-for-llm-integration">Using LangChain for LLM Integration</a></li>
+  <li><a href="#prompt-engineering" id="toc-prompt-engineering" class="nav-link" data-scroll-target="#prompt-engineering">Prompt Engineering</a></li>
+  <li><a href="#output-validation" id="toc-output-validation" class="nav-link" data-scroll-target="#output-validation">Output Validation</a></li>
+  <li><a href="#future-improvements" id="toc-future-improvements" class="nav-link" data-scroll-target="#future-improvements">Future Improvements</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Using LLMs to Extract Legal Entities from Audit Court Decisions</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Data Science</div>
+    <div class="quarto-category">LLM</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    This post demonstrates a hybrid pipeline with regular expressions and LLMs to extract fines, reimbursements, and recommendations from Brazilian audit court decisions.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Eduardo P. Lima </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">January 22, 2021</p>
+    </div>
+  </div>
+  
+    <div>
+    <div class="quarto-title-meta-heading">Modified</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date-modified">January 22, 2021</p>
+    </div>
+  </div>
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><a href="https://colab.research.google.com/github/eduardoplima/decisoes-lm/blob/main/decisoes.ipynb" target="_blank"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open in Colab"></a></p>
+<section id="using-llms-for-analyzing-decisions-of-the-state-audit-court-of-rio-grande-do-norte" class="level2">
+<h2 class="anchored" data-anchor-id="using-llms-for-analyzing-decisions-of-the-state-audit-court-of-rio-grande-do-norte">Using LLMs for Analyzing Decisions of the State Audit Court of Rio Grande do Norte</h2>
+<p>Audit Courts in Brazil have a range of constitutional duties, including the judgment of public accounts and the evaluation of personnel acts, such as hiring and retirement of civil servants. The collegiate body, typically composed of seven auditors, holds the authority to impose fines and obligations on public managers who fail to comply with legal norms or operational standards.</p>
+<p>In the case of the Audit Court of Rio Grande do Norte (TCE/RN), a recent restructuring has established the Procedural Instruction Directorate, responsible for reviewing, processing, and forwarding cases related to external control. Within this directorate, the Decision Control Coordination (CCD) is tasked with registering, monitoring, and tracking the enforcement of the Court’s decisions and audit recommendations.</p>
+<p>The CCD also maintains the General Decision Tracking Registry (CGAD), established under Article 431 of the Internal Regulations of TCE/RN, which includes:</p>
+<ul>
+<li>General Registry of Fines (CGM), for ongoing tracking of payments made directly to the Court;</li>
+<li>General Registry of Reimbursements (CGD), for tracking orders for restitution to State and Municipal Treasuries;</li>
+<li>General Registry of Recommendations (CGR), for tracking orders to perform or abstain from certain actions;</li>
+<li>General Registry of Management Adjustment Agreements (CGTAG), for agreements negotiated by the Public Ministry with the Court.</li>
+</ul>
+<p>This notebook employs Named Entity Recognition (NER), word embeddings, and Large Language Models (LLMs) to automatically build these registries.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>pip install pydantic langchain_openai langchain_community gdown langgraph pandas pypdf <span class="op">&gt;&gt;</span> <span class="op">/</span>dev<span class="op">/</span>null</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> getpass</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> gdown</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> typing</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pydantic</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain.prompts <span class="im">import</span> PromptTemplate, ChatPromptTemplate, FewShotChatMessagePromptTemplate</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_openai <span class="im">import</span> OpenAI, ChatOpenAI</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>os.environ[<span class="st">"OPENAI_API_KEY"</span>] <span class="op">=</span> getpass.getpass(<span class="st">"OPENAI_API_KEY:"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="environment-setup" class="level2">
+<h2 class="anchored" data-anchor-id="environment-setup">Environment Setup</h2>
+<p>Install and import the required Python packages for working with LLMs, document parsing, and data manipulation.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pypdf</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> read_pdf(url):</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> [page.extract_text() <span class="cf">for</span> page <span class="kw">in</span> pypdf.PdfReader(url).pages]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>url <span class="op">=</span> <span class="st">"https://raw.githubusercontent.com/eduardoplima/decisoes-lm/refs/heads/main/dataset.json"</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>output <span class="op">=</span> <span class="st">"dataset.json"</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>gdown.download(url, output)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>url <span class="op">=</span> <span class="st">"https://raw.githubusercontent.com/eduardoplima/decisoes-lm/refs/heads/main/tipos_processos.csv"</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>output <span class="op">=</span> <span class="st">"tipos_processos.csv"</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>gdown.download(url, output)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>tipos <span class="op">=</span> pd.read_csv(<span class="st">"tipos_processos.csv"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.read_json(<span class="st">"dataset.json"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(df)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>df.columns</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>df.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="file-preparation" class="level2">
+<h2 class="anchored" data-anchor-id="file-preparation">File Preparation</h2>
+<p>Download the dataset containing decisions from TCE/RN and save it locally for processing.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>df[<span class="st">'texto'</span>] <span class="op">=</span> df[<span class="st">'texto'</span>].<span class="bu">apply</span>(<span class="kw">lambda</span> x: <span class="st">''</span>.join(x))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="dataset-loading" class="level2">
+<h2 class="anchored" data-anchor-id="dataset-loading">Dataset Loading</h2>
+<p>Load the CSV file containing the decisions. We’ll examine the structure and content of the dataset.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(df.iloc[<span class="dv">15</span>].texto)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="initial-exploration" class="level2">
+<h2 class="anchored" data-anchor-id="initial-exploration">Initial Exploration</h2>
+<p>Preview the dataset and review examples from the ‘conclusao’ column, which will be used to extract entities.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(df.iloc[<span class="dv">20</span>].texto)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="manual-rules-for-ner" class="level2">
+<h2 class="anchored" data-anchor-id="manual-rules-for-ner">Manual Rules for NER</h2>
+<p>Define initial heuristics to extract named entities from the decision text using regular expressions.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(df[df.codigo_tipo_processo <span class="op">==</span> <span class="st">'TAG'</span>].iloc[<span class="dv">0</span>].texto)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="cleaned-entity-extraction" class="level2">
+<h2 class="anchored" data-anchor-id="cleaned-entity-extraction">Cleaned Entity Extraction</h2>
+<p>Use regex to extract structured entities such as fines, reimbursements, and obligations from the ‘conclusao’ field.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>llm <span class="op">=</span> ChatOpenAI(temperature<span class="op">=</span><span class="dv">0</span>, model_name<span class="op">=</span><span class="st">'gpt-4o'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(llm)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="entity-types-fines-and-sanctions" class="level2">
+<h2 class="anchored" data-anchor-id="entity-types-fines-and-sanctions">Entity Types: Fines and Sanctions</h2>
+<p>Identify and extract different types of fines: standard fine, daily coercive fine, percentage-based reimbursement.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>pages_relatorio <span class="op">=</span> read_pdf(<span class="st">"relatorio_teste.pdf"</span>)</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>pages_relatorio2 <span class="op">=</span> read_pdf(<span class="st">"relatorio_teste_2.pdf"</span>)</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>pages_relatorio3 <span class="op">=</span> read_pdf(<span class="st">"relatorio_teste_3.pdf"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> Optional, List</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pydantic <span class="im">import</span> BaseModel, Field</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Criterio(BaseModel):</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">"""Critério para determinação de irregularidade"""</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>  descricao: <span class="bu">str</span> <span class="op">=</span> Field(description<span class="op">=</span><span class="st">"Texto descritivo do critério"</span>)</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Encaminhamento(BaseModel):</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">"""Encaminhamento de irregularidade"""</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>  descricao: <span class="bu">str</span> <span class="op">=</span> Field(description<span class="op">=</span><span class="st">"Texto descritivo do encaminhamento"</span>)</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Irregularidade(BaseModel):</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>  <span class="co">"""Irregularidade encontrada no relatório"""</span></span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>  criterio: Criterio <span class="op">=</span> Field(description<span class="op">=</span><span class="st">"Critério que determina a irregularidade"</span>)</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>  encaminhamento: Encaminhamento <span class="op">=</span> Field(description<span class="op">=</span><span class="st">"Encaminhamento para a irregularidade"</span>)</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Relatorio(BaseModel):</span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">"""Relatorio de Auditoria"""</span></span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>  diretoria: <span class="bu">str</span> <span class="op">=</span> Field(description<span class="op">=</span><span class="st">"Nome da diretoria que realizou a auditoria"</span>)</span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>  auditores: List[<span class="bu">str</span>] <span class="op">=</span> Field(description<span class="op">=</span><span class="st">"Auditores que escreveram o relatório"</span>)</span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>  irregularidades: List[Irregularidade] <span class="op">=</span> Field(description<span class="op">=</span><span class="st">"Irregulidades encontradas no relatório"</span>)</span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> identify_relatorio(relatorio):</span>
+<span id="cb21-24"><a href="#cb21-24" aria-hidden="true" tabindex="-1"></a>  prompt <span class="op">=</span> PromptTemplate.from_template(<span class="st">"""</span></span>
+<span id="cb21-25"><a href="#cb21-25" aria-hidden="true" tabindex="-1"></a><span class="st"> Você é um agente que identifica irregularidades apontadas em relatórios de auditoria.</span></span>
+<span id="cb21-26"><a href="#cb21-26" aria-hidden="true" tabindex="-1"></a><span class="st">Você recebeu um relatório de auditoria e precisa identificar quais são as irregularidades apontadas no relatório.</span></span>
+<span id="cb21-27"><a href="#cb21-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-28"><a href="#cb21-28" aria-hidden="true" tabindex="-1"></a><span class="st">Relatório : </span><span class="sc">{input}</span></span>
+<span id="cb21-29"><a href="#cb21-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-30"><a href="#cb21-30" aria-hidden="true" tabindex="-1"></a><span class="st">Sua resposta: """</span>)</span>
+<span id="cb21-31"><a href="#cb21-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-32"><a href="#cb21-32" aria-hidden="true" tabindex="-1"></a>  structured_llm <span class="op">=</span> llm.with_structured_output(schema<span class="op">=</span>Relatorio)</span>
+<span id="cb21-33"><a href="#cb21-33" aria-hidden="true" tabindex="-1"></a>  chain <span class="op">=</span> prompt <span class="op">|</span> structured_llm</span>
+<span id="cb21-34"><a href="#cb21-34" aria-hidden="true" tabindex="-1"></a>  response <span class="op">=</span> chain.invoke({<span class="st">"input"</span>: relatorio})</span>
+<span id="cb21-35"><a href="#cb21-35" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> response</span>
+<span id="cb21-36"><a href="#cb21-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-37"><a href="#cb21-37" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> identify_pagina_irregularidade(page):</span>
+<span id="cb21-38"><a href="#cb21-38" aria-hidden="true" tabindex="-1"></a>  prompt <span class="op">=</span> PromptTemplate.from_template(<span class="st">"""</span></span>
+<span id="cb21-39"><a href="#cb21-39" aria-hidden="true" tabindex="-1"></a><span class="st"> Você é um agente que identifica se uma página de um relatório de auditoria contém uma lista de irregularidades.</span></span>
+<span id="cb21-40"><a href="#cb21-40" aria-hidden="true" tabindex="-1"></a><span class="st">Você recebeu uma página de um relatório de auditoria e precisa identificar se a página contém irregularidades.</span></span>
+<span id="cb21-41"><a href="#cb21-41" aria-hidden="true" tabindex="-1"></a><span class="st">                                        Responda com Sim apenas se na página houver uma lista de irregularidades.</span></span>
+<span id="cb21-42"><a href="#cb21-42" aria-hidden="true" tabindex="-1"></a><span class="st">                                        </span></span>
+<span id="cb21-43"><a href="#cb21-43" aria-hidden="true" tabindex="-1"></a><span class="st">                                        Responda apenas com S para sim e N para não.</span></span>
+<span id="cb21-44"><a href="#cb21-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-45"><a href="#cb21-45" aria-hidden="true" tabindex="-1"></a><span class="st">Página : </span><span class="sc">{input}</span></span>
+<span id="cb21-46"><a href="#cb21-46" aria-hidden="true" tabindex="-1"></a><span class="st">                                        Suas respostas: """</span>)</span>
+<span id="cb21-47"><a href="#cb21-47" aria-hidden="true" tabindex="-1"></a>  chain <span class="op">=</span> prompt <span class="op">|</span> llm</span>
+<span id="cb21-48"><a href="#cb21-48" aria-hidden="true" tabindex="-1"></a>  response <span class="op">=</span> chain.invoke({<span class="st">"input"</span>: page})</span>
+<span id="cb21-49"><a href="#cb21-49" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> response</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>[(i, identify_pagina_irregularidade(p).content) <span class="cf">for</span> i,p <span class="kw">in</span> <span class="bu">enumerate</span>(pages_relatorio2)]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> identify_relatorio(<span class="st">''</span>.join(pages_relatorio3))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> r.irregularidades:</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(i)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> identify_relatorio(relatorio)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> r.irregularidade:</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(i)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>r2 <span class="op">=</span> identify_relatorio(relatorio2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> r2.irregularidade:</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(i)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>prompt <span class="op">=</span> PromptTemplate.from_template(<span class="st">"""</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="st">Você é um agente que identifica irregularidades apontadas em relatórios de auditoria.</span></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="st">Você recebeu um relatório de auditoria e precisa identificar quais são as irregularidades apontadas no relatório.</span></span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a><span class="st">Relatório : </span><span class="sc">{input}</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a><span class="st">Sua resposta:</span></span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a><span class="st">"""</span>)</span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>chain <span class="op">=</span> prompt <span class="op">|</span> llm</span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> chain.invoke({<span class="st">"input"</span>: relatorio})</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(response.content)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>llm</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>monitoramentos <span class="op">=</span> df[df[<span class="st">'texto'</span>].<span class="bu">str</span>.contains(<span class="st">'monitoramento'</span>)]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(monitoramentos)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="bu">len</span>(df)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="entity-types-recommendations-and-obligations" class="level2">
+<h2 class="anchored" data-anchor-id="entity-types-recommendations-and-obligations">Entity Types: Recommendations and Obligations</h2>
+<p>Extract judicial recommendations and compliance obligations, distinguishing between ‘do’ and ‘do not do’.</p>
+<div class="sourceCode" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> classify_decision(state):</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>  examples <span class="op">=</span> [</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>      {</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>          <span class="st">"input"</span>: <span class="st">"""</span></span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a><span class="st">          - Adoção das providências cabíveis no tocante aos indícios de impropriedades /irregularidades</span></span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a><span class="st">  elencadas na tabela 19 do Relatório (transcritas acima ), com fundamento no art. 2º, inciso III, da</span></span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a><span class="st">  Resolução nº 012/2023-TCE, notadamente para que a Secretaria de Controle Externo analise a</span></span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a><span class="st">  capacidade operacional desta Corte com vistas ao acompanhamento e /ou à abertura de processo</span></span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a><span class="st">  autônomo, respeitadas a conveniência e oportunidade, referente aos itens 4.2 (Divergência dos</span></span>
+<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a><span class="st">  dados do planejamento do Projeto, Inconsistência dos saldos da conta bens móveis entre os</span></span>
+<span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a><span class="st">  registros do SIGEF - Sistema Integrado de Planejamento e Gestão Fiscal - e SMI - Sistema de</span></span>
+<span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a><span class="st">  Monitoramento e Informações do Projeto - e deficiências na elaboração das notas explicativas ),</span></span>
+<span id="cb35-13"><a href="#cb35-13" aria-hidden="true" tabindex="-1"></a><span class="st">  5.5.1.1 (Inventário físico ), 5.6.1.1 ( Falhas/deficiências construtivas do Hospital Regional da</span></span>
+<span id="cb35-14"><a href="#cb35-14" aria-hidden="true" tabindex="-1"></a><span class="st">  Mulher Parteira Maria Correia) e 5.6.1.3 (Pendências de legalização das obras da Biblioteca</span></span>
+<span id="cb35-15"><a href="#cb35-15" aria-hidden="true" tabindex="-1"></a><span class="st">  Câmara Cascudo e da Sede do Serviço Nacional de Emprego – SINE)."""</span>,</span>
+<span id="cb35-16"><a href="#cb35-16" aria-hidden="true" tabindex="-1"></a>          <span class="st">"output"</span>: <span class="st">"DETERMINACAO"</span>}, {</span>
+<span id="cb35-17"><a href="#cb35-17" aria-hidden="true" tabindex="-1"></a>          <span class="st">"input"</span>: <span class="st">"""( a.i) promovam, no prazo de 120 (cento e vinte dias) úteis, contados a partir da intimação da</span></span>
+<span id="cb35-18"><a href="#cb35-18" aria-hidden="true" tabindex="-1"></a><span class="st">  presente Decisão, a apuração dos fatos e se verifique a constitucionalidade e legalidade dos</span></span>
+<span id="cb35-19"><a href="#cb35-19" aria-hidden="true" tabindex="-1"></a><span class="st">  vínculos funcionais de cada servidor que figura nos Anexos nºs. 01 e 02 contidos nos Eventos</span></span>
+<span id="cb35-20"><a href="#cb35-20" aria-hidden="true" tabindex="-1"></a><span class="st">  nºs. 04 e 05, além de outros que porventura sejam informados pela DDP em cumprimento ao</span></span>
+<span id="cb35-21"><a href="#cb35-21" aria-hidden="true" tabindex="-1"></a><span class="st">  item b, por meio da instauração de processos administrativos disciplinares individuais ,</span></span>
+<span id="cb35-22"><a href="#cb35-22" aria-hidden="true" tabindex="-1"></a><span class="st">  regulados pela Lei que trata do Estatuto Jurídico dos Servidores do respectivo Município ,</span></span>
+<span id="cb35-23"><a href="#cb35-23" aria-hidden="true" tabindex="-1"></a><span class="st">  com observância dos princípios do contraditório, ampla defesa e devido processo legal;</span></span>
+<span id="cb35-24"><a href="#cb35-24" aria-hidden="true" tabindex="-1"></a><span class="st">    ( a.ii) comprovem neste feito, em 05 dias úteis após ultimado o prazo de definição dos PAD</span></span>
+<span id="cb35-25"><a href="#cb35-25" aria-hidden="true" tabindex="-1"></a><span class="st">  ´s, as conclusões de todos os processos administrativos instaurados, no tocante à eliminação</span></span>
+<span id="cb35-26"><a href="#cb35-26" aria-hidden="true" tabindex="-1"></a><span class="st">  de tríplice vínculo funcional identificado e de enquadramento das eventuais acumulações</span></span>
+<span id="cb35-27"><a href="#cb35-27" aria-hidden="true" tabindex="-1"></a><span class="st">  dúplices nas hipóteses permitidas pela Constituição Federal, com a respectiva</span></span>
+<span id="cb35-28"><a href="#cb35-28" aria-hidden="true" tabindex="-1"></a><span class="st">  compatibilidade de horários, sob pena de, não cumprindo tais obrigações nos prazos antes</span></span>
+<span id="cb35-29"><a href="#cb35-29" aria-hidden="true" tabindex="-1"></a><span class="st">  referidos, incidir em multa diária e pessoal ao gestor, no valor de R$ 500,00, com espeque no</span></span>
+<span id="cb35-30"><a href="#cb35-30" aria-hidden="true" tabindex="-1"></a><span class="st">  art. 110 da LCE nº 464/2012 c/c o art. 326 do RITCE, cabendo à Diretoria de Despesa com</span></span>
+<span id="cb35-31"><a href="#cb35-31" aria-hidden="true" tabindex="-1"></a><span class="st">  Pessoal monitorar o cumprimento da presente Decisão;"""</span>,</span>
+<span id="cb35-32"><a href="#cb35-32" aria-hidden="true" tabindex="-1"></a>          <span class="st">"output"</span>: <span class="st">"DETERMINACAO"</span>}, {</span>
+<span id="cb35-33"><a href="#cb35-33" aria-hidden="true" tabindex="-1"></a>          <span class="st">"input"</span>: <span class="st">"""Vistos, relatados e discutidos estes autos, em consonância ao posicionamento do</span></span>
+<span id="cb35-34"><a href="#cb35-34" aria-hidden="true" tabindex="-1"></a><span class="st">  Corpo técnico e do Ministério Público de Contas, ACORDAM os Conselheiros, nos termos</span></span>
+<span id="cb35-35"><a href="#cb35-35" aria-hidden="true" tabindex="-1"></a><span class="st">  do voto proposto pelo Conselheiro Relator, julgar a inadmissibilidade da presente denúncia e</span></span>
+<span id="cb35-36"><a href="#cb35-36" aria-hidden="true" tabindex="-1"></a><span class="st">  o seu conseqüente arquivamento, com fulcro nos art. 12 do Provimento 002/2020 –</span></span>
+<span id="cb35-37"><a href="#cb35-37" aria-hidden="true" tabindex="-1"></a><span class="st">  CORREG/TCE, aprovado pela Resolução 016/2020 – TCE e artigo 80, § 1º, da LOTCE.</span></span>
+<span id="cb35-38"><a href="#cb35-38" aria-hidden="true" tabindex="-1"></a><span class="st">  E ainda, Pela expedição de RECOMENDAÇÃO, nos termos do art. 301, III da Resolução</span></span>
+<span id="cb35-39"><a href="#cb35-39" aria-hidden="true" tabindex="-1"></a><span class="st">  009/2012 (RITCE/RN) c/c art. 13, II da Resolução 16/2020 –TCE/RN, ao Executivo</span></span>
+<span id="cb35-40"><a href="#cb35-40" aria-hidden="true" tabindex="-1"></a><span class="st">  Municipal de Nísia Floresta /RN, com cópia para o respectivo órgão de controle interno, ou</span></span>
+<span id="cb35-41"><a href="#cb35-41" aria-hidden="true" tabindex="-1"></a><span class="st">  setor responsável pelas publicações oficiais, lastreada na Constituição Federal de 88/ Art. 37,</span></span>
+<span id="cb35-42"><a href="#cb35-42" aria-hidden="true" tabindex="-1"></a><span class="st">  a fim de que promova e deixe claro os seguintes comportamentos em suas postagens"""</span>,</span>
+<span id="cb35-43"><a href="#cb35-43" aria-hidden="true" tabindex="-1"></a>          <span class="st">"output"</span>: <span class="st">"DETERMINACAO"</span>},{</span>
+<span id="cb35-44"><a href="#cb35-44" aria-hidden="true" tabindex="-1"></a>          <span class="st">"input"</span>: <span class="st">"""Vistos, relatados e discutidos estes autos, concordando com o proposto pelo Corpo</span></span>
+<span id="cb35-45"><a href="#cb35-45" aria-hidden="true" tabindex="-1"></a><span class="st">  Técnico e pelo órgão Ministerial de Contas, ACORDAM os Conselheiros, nos termos do voto</span></span>
+<span id="cb35-46"><a href="#cb35-46" aria-hidden="true" tabindex="-1"></a><span class="st">  proferido pelo Conselheiro Relator, julgar pela irregularidade da matéria, nos termos do art .</span></span>
+<span id="cb35-47"><a href="#cb35-47" aria-hidden="true" tabindex="-1"></a><span class="st">  75, inciso I, da Lei Complementar nº 464/2012, condenando o gestor responsável, Sr. Thiago</span></span>
+<span id="cb35-48"><a href="#cb35-48" aria-hidden="true" tabindex="-1"></a><span class="st">  Meira Mangueira, ao pagamento de multa no valor de R$ 18.774,51 (dezoito mil setecentos e</span></span>
+<span id="cb35-49"><a href="#cb35-49" aria-hidden="true" tabindex="-1"></a><span class="st">  setenta e quatro reais e cinquenta e um centavos ), conforme previsto no art. 21, inciso I ,</span></span>
+<span id="cb35-50"><a href="#cb35-50" aria-hidden="true" tabindex="-1"></a><span class="st">  alínea ‘a’ e § 1º, da Resolução nº 012/2016-TCE c /c o art. 107, inciso II, alínea “a” da Lei</span></span>
+<span id="cb35-51"><a href="#cb35-51" aria-hidden="true" tabindex="-1"></a><span class="st">  Complementar nº 464/2012. """</span>,</span>
+<span id="cb35-52"><a href="#cb35-52" aria-hidden="true" tabindex="-1"></a>          <span class="st">"output"</span>: <span class="st">"DETERMINACAO"</span>},</span>
+<span id="cb35-53"><a href="#cb35-53" aria-hidden="true" tabindex="-1"></a>          {</span>
+<span id="cb35-54"><a href="#cb35-54" aria-hidden="true" tabindex="-1"></a>              <span class="st">"input"</span>: <span class="st">"""Vistos, relatados e discutidos estes autos, acolhendo os fundamentos do parecer</span></span>
+<span id="cb35-55"><a href="#cb35-55" aria-hidden="true" tabindex="-1"></a><span class="st">  ministerial, com substrato no art. 209 V da norma regimental, ACORDAM os Conselheiros ,</span></span>
+<span id="cb35-56"><a href="#cb35-56" aria-hidden="true" tabindex="-1"></a><span class="st">  nos termos do voto proposto pela Conselheira Relatora, julgar pelo ARQUIVAMENTO dos</span></span>
+<span id="cb35-57"><a href="#cb35-57" aria-hidden="true" tabindex="-1"></a><span class="st">  autos."""</span>,</span>
+<span id="cb35-58"><a href="#cb35-58" aria-hidden="true" tabindex="-1"></a>              <span class="st">"output"</span>: <span class="st">"OUTROS"</span>,</span>
+<span id="cb35-59"><a href="#cb35-59" aria-hidden="true" tabindex="-1"></a>          },</span>
+<span id="cb35-60"><a href="#cb35-60" aria-hidden="true" tabindex="-1"></a>          {</span>
+<span id="cb35-61"><a href="#cb35-61" aria-hidden="true" tabindex="-1"></a>              <span class="st">"input"</span>: <span class="st">"""Vistos, relatados e discutidos estes autos, ACORDAM os Conselheiros,  com o</span></span>
+<span id="cb35-62"><a href="#cb35-62" aria-hidden="true" tabindex="-1"></a><span class="st">  impedimento do Conselheiro Presidente Renato Costa Dias, nos termos do voto profposto</span></span>
+<span id="cb35-63"><a href="#cb35-63" aria-hidden="true" tabindex="-1"></a><span class="st">  pela Conselheira Relatora, haja vista os fundamentos fático -jurídicos explanados no excerto</span></span>
+<span id="cb35-64"><a href="#cb35-64" aria-hidden="true" tabindex="-1"></a><span class="st">  antecedente, comprovado documentalmente o adimplemento substancial do plano de</span></span>
+<span id="cb35-65"><a href="#cb35-65" aria-hidden="true" tabindex="-1"></a><span class="st">  redimensionamento/adequação do sistema de ensino natalense, julgar pela EXTINÇÃO do</span></span>
+<span id="cb35-66"><a href="#cb35-66" aria-hidden="true" tabindex="-1"></a><span class="st">  FEITO nos termos do art. 71 da Lei Complementar (estadual) c/c art. 22 §1° da LINDB e art .</span></span>
+<span id="cb35-67"><a href="#cb35-67" aria-hidden="true" tabindex="-1"></a><span class="st">  209 V da regra regimental."""</span>,</span>
+<span id="cb35-68"><a href="#cb35-68" aria-hidden="true" tabindex="-1"></a>              <span class="st">"output"</span>: <span class="st">"OUTROS"</span>,</span>
+<span id="cb35-69"><a href="#cb35-69" aria-hidden="true" tabindex="-1"></a>          },</span>
+<span id="cb35-70"><a href="#cb35-70" aria-hidden="true" tabindex="-1"></a>          {</span>
+<span id="cb35-71"><a href="#cb35-71" aria-hidden="true" tabindex="-1"></a>              <span class="st">"input"</span>: <span class="st">"""Vistos, relatados e discutidos estes autos, em consonância com o posicionamento da</span></span>
+<span id="cb35-72"><a href="#cb35-72" aria-hidden="true" tabindex="-1"></a><span class="st">  Diretoria de Administração Municipal – DAM e do Ministério Público de Contas ,</span></span>
+<span id="cb35-73"><a href="#cb35-73" aria-hidden="true" tabindex="-1"></a><span class="st">  ACORDAM os Conselheiros, nos termos do voto proferido pelo Conselheiro Relator, julgar</span></span>
+<span id="cb35-74"><a href="#cb35-74" aria-hidden="true" tabindex="-1"></a><span class="st">  pelo reconhecimento da incidência da Prescrição Intercorrente sobre a pretensão punitiva e</span></span>
+<span id="cb35-75"><a href="#cb35-75" aria-hidden="true" tabindex="-1"></a><span class="st">  ressarcitória desta Corte de Contas, nos termos do artigo 111, parágrafo único, da Lei</span></span>
+<span id="cb35-76"><a href="#cb35-76" aria-hidden="true" tabindex="-1"></a><span class="st">  Complementar Estadual nº 464/2012, com o consequente arquivamento dos presentes autos.</span></span>
+<span id="cb35-77"><a href="#cb35-77" aria-hidden="true" tabindex="-1"></a><span class="st">  E ainda, pelo envio de cópia das principais peças dos autos ao Ministério Público Estadual ,</span></span>
+<span id="cb35-78"><a href="#cb35-78" aria-hidden="true" tabindex="-1"></a><span class="st">  para conhecimento e atuação no âmbito de sua competência."""</span>,</span>
+<span id="cb35-79"><a href="#cb35-79" aria-hidden="true" tabindex="-1"></a>              <span class="st">"output"</span>: <span class="st">"OUTROS"</span>,</span>
+<span id="cb35-80"><a href="#cb35-80" aria-hidden="true" tabindex="-1"></a>          },</span>
+<span id="cb35-81"><a href="#cb35-81" aria-hidden="true" tabindex="-1"></a>          {</span>
+<span id="cb35-82"><a href="#cb35-82" aria-hidden="true" tabindex="-1"></a>              <span class="st">"input"</span>: <span class="st">"""Vistos, relatados e discutidos estes autos, em dissonância com o Ministério Público</span></span>
+<span id="cb35-83"><a href="#cb35-83" aria-hidden="true" tabindex="-1"></a><span class="st">  de Contas, ACORDAM os Conselheiros, nos termos do voto proferido pelo Conselheiro</span></span>
+<span id="cb35-84"><a href="#cb35-84" aria-hidden="true" tabindex="-1"></a><span class="st">  Relator, julgar pela extinção do feito, sem julgamento de mérito, com o consequente</span></span>
+<span id="cb35-85"><a href="#cb35-85" aria-hidden="true" tabindex="-1"></a><span class="st">  ARQUIV AMENTO dos autos, em virtude da incompatibilidade entre a emissão de parecer</span></span>
+<span id="cb35-86"><a href="#cb35-86" aria-hidden="true" tabindex="-1"></a><span class="st">  prévio pela aprovação com ressalvas das contas de governo e a instauração de apuração de</span></span>
+<span id="cb35-87"><a href="#cb35-87" aria-hidden="true" tabindex="-1"></a><span class="st">  responsabilidade para aplicação de sanções."""</span>,</span>
+<span id="cb35-88"><a href="#cb35-88" aria-hidden="true" tabindex="-1"></a>              <span class="st">"output"</span>: <span class="st">"OUTROS"</span>,</span>
+<span id="cb35-89"><a href="#cb35-89" aria-hidden="true" tabindex="-1"></a>          }</span>
+<span id="cb35-90"><a href="#cb35-90" aria-hidden="true" tabindex="-1"></a>  ]</span>
+<span id="cb35-91"><a href="#cb35-91" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-92"><a href="#cb35-92" aria-hidden="true" tabindex="-1"></a>  example_prompt <span class="op">=</span> ChatPromptTemplate.from_messages([</span>
+<span id="cb35-93"><a href="#cb35-93" aria-hidden="true" tabindex="-1"></a>        (<span class="st">"human"</span>, <span class="st">'''</span></span>
+<span id="cb35-94"><a href="#cb35-94" aria-hidden="true" tabindex="-1"></a><span class="st">         </span><span class="sc">{input}</span><span class="st"> '''</span>),</span>
+<span id="cb35-95"><a href="#cb35-95" aria-hidden="true" tabindex="-1"></a>        (<span class="st">"ai"</span>, <span class="st">"</span><span class="sc">{output}</span><span class="st">"</span>),</span>
+<span id="cb35-96"><a href="#cb35-96" aria-hidden="true" tabindex="-1"></a>    ])</span>
+<span id="cb35-97"><a href="#cb35-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-98"><a href="#cb35-98" aria-hidden="true" tabindex="-1"></a>  few_shot_prompt <span class="op">=</span> FewShotChatMessagePromptTemplate(</span>
+<span id="cb35-99"><a href="#cb35-99" aria-hidden="true" tabindex="-1"></a>    example_prompt<span class="op">=</span>example_prompt,</span>
+<span id="cb35-100"><a href="#cb35-100" aria-hidden="true" tabindex="-1"></a>    examples<span class="op">=</span>examples,)</span>
+<span id="cb35-101"><a href="#cb35-101" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-102"><a href="#cb35-102" aria-hidden="true" tabindex="-1"></a>  final_prompt <span class="op">=</span> ChatPromptTemplate.from_messages(</span>
+<span id="cb35-103"><a href="#cb35-103" aria-hidden="true" tabindex="-1"></a>    [</span>
+<span id="cb35-104"><a href="#cb35-104" aria-hidden="true" tabindex="-1"></a>        (<span class="st">"system"</span>, <span class="st">"""Você é um classificador de decisões de um tribunal de contas.</span></span>
+<span id="cb35-105"><a href="#cb35-105" aria-hidden="true" tabindex="-1"></a><span class="st">         Sua tarefa é definir se uma decisão trata de uma multa ou obrigação</span></span>
+<span id="cb35-106"><a href="#cb35-106" aria-hidden="true" tabindex="-1"></a><span class="st">         de fazer.</span></span>
+<span id="cb35-107"><a href="#cb35-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-108"><a href="#cb35-108" aria-hidden="true" tabindex="-1"></a><span class="st">         Responda com DETERMINACAO se o texto contiver o termo "multa" e alguma recomendação ou obrigação de fazer</span></span>
+<span id="cb35-109"><a href="#cb35-109" aria-hidden="true" tabindex="-1"></a><span class="st">         Responda com OUTROS se o texto tratar de arquivamento, extinção do feito ou prescrição da matéria, ou outro assunto que não seja DETERMINACAO</span></span>
+<span id="cb35-110"><a href="#cb35-110" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-111"><a href="#cb35-111" aria-hidden="true" tabindex="-1"></a><span class="st">         Responda APENAS com DETERMINACAO ou OUTROS."""</span>),</span>
+<span id="cb35-112"><a href="#cb35-112" aria-hidden="true" tabindex="-1"></a>        few_shot_prompt,</span>
+<span id="cb35-113"><a href="#cb35-113" aria-hidden="true" tabindex="-1"></a>        (<span class="st">"human"</span>, <span class="st">"</span><span class="sc">{input}</span><span class="st">"</span>),])</span>
+<span id="cb35-114"><a href="#cb35-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-115"><a href="#cb35-115" aria-hidden="true" tabindex="-1"></a>  chain <span class="op">=</span> final_prompt <span class="op">|</span> llm</span>
+<span id="cb35-116"><a href="#cb35-116" aria-hidden="true" tabindex="-1"></a>  decision_type <span class="op">=</span> chain.invoke({<span class="st">"input"</span>: state[<span class="st">"messages"</span>]}).content</span>
+<span id="cb35-117"><a href="#cb35-117" aria-hidden="true" tabindex="-1"></a>  state[<span class="st">'messages'</span>] <span class="op">=</span> state[<span class="st">'messages'</span>] <span class="op">+</span> [decision_type]</span>
+<span id="cb35-118"><a href="#cb35-118" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> state</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="structured-output-example" class="level2">
+<h2 class="anchored" data-anchor-id="structured-output-example">Structured Output Example</h2>
+<p>Show how the extracted entities can be structured for analysis and registration in the CGAD system.</p>
+<div class="sourceCode" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>classify_decision({<span class="st">'messages'</span>: [df.iloc[<span class="dv">1</span>].texto]})</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(df.iloc[<span class="dv">1</span>].texto)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>classify_decision({<span class="st">'messages'</span>: [df.iloc[<span class="dv">0</span>].texto]})</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(df.iloc[<span class="dv">0</span>].texto)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="using-langchain-for-llm-integration" class="level2">
+<h2 class="anchored" data-anchor-id="using-langchain-for-llm-integration">Using LangChain for LLM Integration</h2>
+<p>Configure a LangChain pipeline using OpenAI or local models to extract and structure named entities.</p>
+<div class="sourceCode" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> Optional, List</span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pydantic <span class="im">import</span> BaseModel, Field</span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Multa(BaseModel):</span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">"""Determinação de multa, com valor e responsável"""</span></span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a>  responsavel: <span class="bu">str</span> <span class="op">=</span> Field(description<span class="op">=</span><span class="st">"Nome do responsável pela multa"</span>)</span>
+<span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a>  valor: <span class="bu">float</span> <span class="op">=</span> Field(description<span class="op">=</span><span class="st">"Valor da multa"</span>)</span>
+<span id="cb41-9"><a href="#cb41-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-10"><a href="#cb41-10" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Obrigacao(BaseModel):</span>
+<span id="cb41-11"><a href="#cb41-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">"""Determinação de obrigação, com valor e responsável"""</span></span>
+<span id="cb41-12"><a href="#cb41-12" aria-hidden="true" tabindex="-1"></a>  responsavel: <span class="bu">str</span> <span class="op">=</span> Field(description<span class="op">=</span><span class="st">"Nome do órgão ou gestor responsável pela obrigação"</span>)</span>
+<span id="cb41-13"><a href="#cb41-13" aria-hidden="true" tabindex="-1"></a>  descricao: <span class="bu">str</span> <span class="op">=</span> Field(description<span class="op">=</span><span class="st">"Texto descritivo da obrigação"</span>)</span>
+<span id="cb41-14"><a href="#cb41-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-15"><a href="#cb41-15" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Decisao(BaseModel):</span>
+<span id="cb41-16"><a href="#cb41-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">"""Decisão processual do TCE/RN"""</span></span>
+<span id="cb41-17"><a href="#cb41-17" aria-hidden="true" tabindex="-1"></a>  determinacao: List[Optional[Multa <span class="op">|</span> Obrigacao]] <span class="op">=</span> Field(description<span class="op">=</span><span class="st">"Determinação de multa ou obrigação"</span>)</span>
+<span id="cb41-18"><a href="#cb41-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-19"><a href="#cb41-19" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> identify_decision(state):</span>
+<span id="cb41-20"><a href="#cb41-20" aria-hidden="true" tabindex="-1"></a>  prompt <span class="op">=</span> PromptTemplate.from_template(<span class="st">"""</span></span>
+<span id="cb41-21"><a href="#cb41-21" aria-hidden="true" tabindex="-1"></a><span class="st">  Você é um agente que identifica listas de determinações em textos de decisões. Seu objetivo</span></span>
+<span id="cb41-22"><a href="#cb41-22" aria-hidden="true" tabindex="-1"></a><span class="st">  é extrair um conjunto de textos de uma lista que contém obrigações ou imposições de multas. Se não houver</span></span>
+<span id="cb41-23"><a href="#cb41-23" aria-hidden="true" tabindex="-1"></a><span class="st">  determinações, responda apenas com "N/D"</span></span>
+<span id="cb41-24"><a href="#cb41-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-25"><a href="#cb41-25" aria-hidden="true" tabindex="-1"></a><span class="st">  Decisão : </span><span class="sc">{input}</span></span>
+<span id="cb41-26"><a href="#cb41-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-27"><a href="#cb41-27" aria-hidden="true" tabindex="-1"></a><span class="st">  Sua resposta:</span></span>
+<span id="cb41-28"><a href="#cb41-28" aria-hidden="true" tabindex="-1"></a><span class="st">  """</span>)</span>
+<span id="cb41-29"><a href="#cb41-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-30"><a href="#cb41-30" aria-hidden="true" tabindex="-1"></a>  structured_llm <span class="op">=</span> llm.with_structured_output(schema<span class="op">=</span>Decisao)</span>
+<span id="cb41-31"><a href="#cb41-31" aria-hidden="true" tabindex="-1"></a>  chain <span class="op">=</span> prompt <span class="op">|</span> structured_llm</span>
+<span id="cb41-32"><a href="#cb41-32" aria-hidden="true" tabindex="-1"></a>  response <span class="op">=</span> chain.invoke(state[<span class="st">'messages'</span>])</span>
+<span id="cb41-33"><a href="#cb41-33" aria-hidden="true" tabindex="-1"></a>  state[<span class="st">'messages'</span>] <span class="op">=</span> state[<span class="st">'messages'</span>] <span class="op">+</span> [response]</span>
+<span id="cb41-34"><a href="#cb41-34" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> state</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> identify_decision({<span class="st">'messages'</span>: [df.iloc[<span class="dv">1</span>].texto]})</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="co">'determinacao'</span> <span class="kw">in</span> d[<span class="st">'messages'</span>][<span class="op">-</span><span class="dv">1</span>].__dict__</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>d[<span class="st">'messages'</span>][<span class="op">-</span><span class="dv">1</span>].determinacao[<span class="dv">0</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(df.iloc[<span class="dv">1</span>].texto)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="prompt-engineering" class="level2">
+<h2 class="anchored" data-anchor-id="prompt-engineering">Prompt Engineering</h2>
+<p>Design prompts for the LLM to correctly identify and classify the entities mentioned in the text.</p>
+</section>
+<section id="output-validation" class="level2">
+<h2 class="anchored" data-anchor-id="output-validation">Output Validation</h2>
+<p>Validate the structured output returned by the model against expected schemas.</p>
+<div class="sourceCode" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.tools <span class="im">import</span> StructuredTool</span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search_pessoa(nome):</span>
+<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">"""Procura dados de uma pessoa"""</span></span>
+<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> {</span>
+<span id="cb47-6"><a href="#cb47-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">'nome'</span>: nome,</span>
+<span id="cb47-7"><a href="#cb47-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">'endereço'</span>: <span class="st">'Av Tal, Bairro Bem Ali, nº 1'</span>,</span>
+<span id="cb47-8"><a href="#cb47-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">'telefone'</span>: <span class="st">'84123456789'</span></span>
+<span id="cb47-9"><a href="#cb47-9" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb47-10"><a href="#cb47-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb47-11"><a href="#cb47-11" aria-hidden="true" tabindex="-1"></a>search_pessoa_tool <span class="op">=</span> StructuredTool.from_function(func<span class="op">=</span>search_pessoa, parse_docstring<span class="op">=</span><span class="va">True</span>, )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>search_pessoa_tool.to_json()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>llm_with_tools <span class="op">=</span> llm.bind_tools([search_pessoa_tool])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> identify_decision({<span class="st">'messages'</span>: df.iloc[<span class="dv">1</span>].texto})</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>response[<span class="st">'determinacoes'</span>].determinacao[<span class="dv">0</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb52"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> llm_with_tools.invoke(<span class="bu">str</span>(response[<span class="st">'determinacoes'</span>].determinacao[<span class="dv">0</span>].responsavel))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>response.tool_calls</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="future-improvements" class="level2">
+<h2 class="anchored" data-anchor-id="future-improvements">Future Improvements</h2>
+<p>Discuss how weak supervision or fine-tuned models could improve accuracy and reduce false positives.</p>
+<div class="sourceCode" id="cb54"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a>texto <span class="op">=</span> df.iloc[<span class="dv">1</span>].texto</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb55"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(texto)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb56"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.prebuilt  <span class="im">import</span> ToolNode</span>
+<span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a>tool_node <span class="op">=</span> ToolNode([search_pessoa_tool])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb57"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> operator</span>
+<span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> Annotated, Sequence, TypedDict</span>
+<span id="cb57-3"><a href="#cb57-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.messages <span class="im">import</span> BaseMessage</span>
+<span id="cb57-4"><a href="#cb57-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb57-5"><a href="#cb57-5" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> AgentState(TypedDict):</span>
+<span id="cb57-6"><a href="#cb57-6" aria-hidden="true" tabindex="-1"></a>    messages: Annotated[Sequence[BaseMessage], operator.add]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb58"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.messages <span class="im">import</span> ToolMessage</span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.prebuilt <span class="im">import</span> ToolInvocation</span>
+<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-4"><a href="#cb58-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> should_continue_classify(state):</span>
+<span id="cb58-5"><a href="#cb58-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> state[<span class="st">'messages'</span>][<span class="op">-</span><span class="dv">1</span>]:</span>
+<span id="cb58-6"><a href="#cb58-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"end"</span></span>
+<span id="cb58-7"><a href="#cb58-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb58-8"><a href="#cb58-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"continue"</span></span>
+<span id="cb58-9"><a href="#cb58-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-10"><a href="#cb58-10" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> should_continue_identify(state):</span>
+<span id="cb58-11"><a href="#cb58-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> state[<span class="st">'messages'</span>][<span class="op">-</span><span class="dv">1</span>] <span class="op">==</span> <span class="st">'DETERMINACAO'</span>:</span>
+<span id="cb58-12"><a href="#cb58-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"end"</span></span>
+<span id="cb58-13"><a href="#cb58-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb58-14"><a href="#cb58-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"continue"</span></span>
+<span id="cb58-15"><a href="#cb58-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-16"><a href="#cb58-16" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> call_model(state):</span>
+<span id="cb58-17"><a href="#cb58-17" aria-hidden="true" tabindex="-1"></a>    messages <span class="op">=</span> state[<span class="st">"messages"</span>]</span>
+<span id="cb58-18"><a href="#cb58-18" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm_with_tools.invoke(messages)</span>
+<span id="cb58-19"><a href="#cb58-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> response</span>
+<span id="cb58-20"><a href="#cb58-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-21"><a href="#cb58-21" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> call_tool(state):</span>
+<span id="cb58-22"><a href="#cb58-22" aria-hidden="true" tabindex="-1"></a>  <span class="bu">print</span>(state[<span class="st">'messages'</span>][<span class="op">-</span><span class="dv">1</span>].__dict__.keys())</span>
+<span id="cb58-23"><a href="#cb58-23" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> <span class="st">'determinacao'</span> <span class="kw">in</span> state[<span class="st">'messages'</span>][<span class="op">-</span><span class="dv">1</span>].__dict__.keys():</span>
+<span id="cb58-24"><a href="#cb58-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> determinacao <span class="kw">in</span> state[<span class="st">'messages'</span>][<span class="op">-</span><span class="dv">1</span>].determinacao:</span>
+<span id="cb58-25"><a href="#cb58-25" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> <span class="kw">not</span> determinacao.responsavel:</span>
+<span id="cb58-26"><a href="#cb58-26" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb58-27"><a href="#cb58-27" aria-hidden="true" tabindex="-1"></a>      response <span class="op">=</span> llm_with_tools.invoke(<span class="bu">str</span>(determinacao.responsavel))</span>
+<span id="cb58-28"><a href="#cb58-28" aria-hidden="true" tabindex="-1"></a>      <span class="bu">print</span>(response)</span>
+<span id="cb58-29"><a href="#cb58-29" aria-hidden="true" tabindex="-1"></a>      response <span class="op">=</span> tool_node.invoke({<span class="st">'messages'</span>: [response]})</span>
+<span id="cb58-30"><a href="#cb58-30" aria-hidden="true" tabindex="-1"></a>      state[<span class="st">'messages'</span>] <span class="op">=</span> state[<span class="st">'messages'</span>] <span class="op">+</span> [response[<span class="st">'messages'</span>]]</span>
+<span id="cb58-31"><a href="#cb58-31" aria-hidden="true" tabindex="-1"></a>      <span class="cf">return</span> state</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb59"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph <span class="im">import</span> END, StateGraph, START</span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a>workflow <span class="op">=</span> StateGraph(AgentState)</span>
+<span id="cb59-4"><a href="#cb59-4" aria-hidden="true" tabindex="-1"></a>workflow.add_node(<span class="st">"classify"</span>, classify_decision)</span>
+<span id="cb59-5"><a href="#cb59-5" aria-hidden="true" tabindex="-1"></a>workflow.add_node(<span class="st">"identify"</span>, identify_decision)</span>
+<span id="cb59-6"><a href="#cb59-6" aria-hidden="true" tabindex="-1"></a>workflow.add_node(<span class="st">"search"</span>, call_tool)</span>
+<span id="cb59-7"><a href="#cb59-7" aria-hidden="true" tabindex="-1"></a>workflow.add_edge(START, <span class="st">"classify"</span>)</span>
+<span id="cb59-8"><a href="#cb59-8" aria-hidden="true" tabindex="-1"></a>workflow.add_edge(<span class="st">"search"</span>, END)</span>
+<span id="cb59-9"><a href="#cb59-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb59-10"><a href="#cb59-10" aria-hidden="true" tabindex="-1"></a>workflow.add_conditional_edges(</span>
+<span id="cb59-11"><a href="#cb59-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">"classify"</span>,</span>
+<span id="cb59-12"><a href="#cb59-12" aria-hidden="true" tabindex="-1"></a>    should_continue_classify,</span>
+<span id="cb59-13"><a href="#cb59-13" aria-hidden="true" tabindex="-1"></a>    {</span>
+<span id="cb59-14"><a href="#cb59-14" aria-hidden="true" tabindex="-1"></a>        <span class="st">"continue"</span>: <span class="st">"identify"</span>,</span>
+<span id="cb59-15"><a href="#cb59-15" aria-hidden="true" tabindex="-1"></a>        <span class="st">"end"</span>: END,</span>
+<span id="cb59-16"><a href="#cb59-16" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb59-17"><a href="#cb59-17" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb59-18"><a href="#cb59-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb59-19"><a href="#cb59-19" aria-hidden="true" tabindex="-1"></a>workflow.add_conditional_edges(</span>
+<span id="cb59-20"><a href="#cb59-20" aria-hidden="true" tabindex="-1"></a>    <span class="st">"identify"</span>,</span>
+<span id="cb59-21"><a href="#cb59-21" aria-hidden="true" tabindex="-1"></a>    should_continue_classify,</span>
+<span id="cb59-22"><a href="#cb59-22" aria-hidden="true" tabindex="-1"></a>    {</span>
+<span id="cb59-23"><a href="#cb59-23" aria-hidden="true" tabindex="-1"></a>        <span class="st">"continue"</span>: <span class="st">"search"</span>,</span>
+<span id="cb59-24"><a href="#cb59-24" aria-hidden="true" tabindex="-1"></a>        <span class="st">"end"</span>: END,</span>
+<span id="cb59-25"><a href="#cb59-25" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb59-26"><a href="#cb59-26" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb59-27"><a href="#cb59-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb59-28"><a href="#cb59-28" aria-hidden="true" tabindex="-1"></a>app <span class="op">=</span> workflow.<span class="bu">compile</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb60"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> IPython.display <span class="im">import</span> Image, display</span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.runnables.graph <span class="im">import</span> CurveStyle</span>
+<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
+<span id="cb60-5"><a href="#cb60-5" aria-hidden="true" tabindex="-1"></a>    graph_image <span class="op">=</span> app.get_graph(xray<span class="op">=</span><span class="va">True</span>).draw_mermaid_png(curve_style<span class="op">=</span>CurveStyle.NATURAL)</span>
+<span id="cb60-6"><a href="#cb60-6" aria-hidden="true" tabindex="-1"></a>    display(Image(graph_image))</span>
+<span id="cb60-7"><a href="#cb60-7" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb60-8"><a href="#cb60-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(e)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb61"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a>inputs <span class="op">=</span> {<span class="st">"messages"</span>: [df.iloc[<span class="dv">1</span>].texto]}</span>
+<span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> app.invoke(inputs)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb62"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a>result</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>This notebook outlines a hybrid approach using heuristics and LLMs to extract key data from legal decisions, contributing to improved compliance tracking.</p>
+<div class="sourceCode" id="cb63"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

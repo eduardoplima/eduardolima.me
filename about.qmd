@@ -1,0 +1,31 @@
+---
+title: "About Me"
+---
+
+## 👋 Hey, I'm Eduardo
+
+I'm a Portuguese-Brazilian **data scientist**, **Python developer**, and **public sector auditor** currently based in Natal/RN with over 15 years of experience working at the **Audit Court of Rio Grande do Norte (TCE/RN)**. I've spent most of my career contributing to public expenditure audits as an IT expert and data analyst—developing tools, uncovering patterns in large datasets, and applying AI to detect risks and inefficiencies in government spending.
+
+Right now, I'm diving deep into **NLP**, **transformers**, **semi-supervised pipelines**, and exploring how **LLMs** can help extract insights from complex legal decisions. I’m also finishing a **Master’s in Artificial Intelligence**.
+
+### 🛠️ What I Work With
+
+- Python, Pandas, scikit-learn, Hugging Face Transformers  
+- Airflow, SQL, Postgres, Cleanlab, LangChain  
+- Machine Learning, Weak Supervision, Legal NLP  
+
+### 🌊 Outside of Work
+
+When I'm not coding or reading about AI, you'll probably find me:
+
+- 🏄 Surfing or at the beach  
+- ♟️ Playing rapid games on [chess.com/member/lima85](https://www.chess.com/member/lima85)  
+- 🍣 Hunting for good Japanese food  
+- ✈️ Traveling to discover new places and cultures  
+
+### 📬 Let’s Connect
+
+- 💼 LinkedIn: [linkedin.com/in/eduardo-p-lima/](https://www.linkedin.com/in/eduardo-p-lima/)  
+- 🐙 GitHub: [github.com/eduardoplima](https://github.com/eduardoplima)
+
+---

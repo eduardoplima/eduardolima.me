@@ -1,0 +1,780 @@
+
+---
+title: "Annotation Error Detection in Legal NER Datasets with Cleanlab"
+description: "This post applies confident learning techniques with Cleanlab to detect annotation errors in the LeNER-Br dataset, enhancing the quality of legal named entity recognition tasks."
+author: "Eduardo P. Lima"
+date: "2025-05-18"
+date-modified: "2025-05-18"
+categories:
+  - Data Science
+  - Annotation Error Detection
+  - Named Entity Recognition
+---
+
+<a href="https://colab.research.google.com/github/eduardoplima/aed-lener-br/blob/main/aed-lener-br-en.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
+# Annotation Error Detection in the LeNER-Br Dataset
+
+Annotation Error Detection is a technique used to identify inconsistencies or incorrect labels in manually annotated datasets. These errors can compromise the quality of models trained on this data for tasks such as Named Entity Recognition. Detection tools and methods aim to locate these flaws automatically, ensuring greater data reliability and better model performance.
+
+In this notebook, we will analyze the LeNER-Br dataset with the goal of identifying possible annotation errors using the confident learning technique, implemented by the Cleanlab library. This approach allows for the detection of incorrectly labeled instances based on the probabilistic predictions of a classifier, as we will see in the code below.
+
+The LeNER-Br dataset is a Portuguese corpus focused on Named Entity Recognition (NER) in Brazilian legal texts. Developed by Luz et al. (2018), LeNER-Br is composed exclusively of legal documents, such as judicial decisions and opinions, collected from various Brazilian courts. It was manually annotated to identify entities like people, organizations, locations, and temporal expressions, in addition to specific legal categories such as LEGISLATION and JURISPRUDENCE, which are not common in other Portuguese corpora. The complete description of the work can be read in the article available at https://teodecampos.github.io/LeNER-Br/luz_etal_propor2018.pdf
+
+# Environment Setup
+
+We install the Cleanlab library, which will be used to apply confident learning techniques to identify possible annotation errors in the LeNER-Br dataset. Then, we import the necessary libraries for the rest of the analysis and download the training and test files directly from the official LeNER-Br repository. As the files are in CoNLL format, which organizes data in columns, it is necessary to convert them to the BIO (Beginning, Inside, Outside) format, widely used in Named Entity Recognition tasks, to facilitate subsequent processing.
+
+
+
+
+```python
+#!pip install cleanlab
+```
+
+
+```python
+import os
+import re
+import requests
+import zipfile
+import numpy as np
+import pandas as pd
+import torch
+
+from sklearn.model_selection import StratifiedKFold
+from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+from sklearn.linear_model import SGDClassifier
+
+from transformers import AutoTokenizer, AutoModel
+from cleanlab.filter import find_label_issues
+
+```
+
+
+```python
+!wget https://raw.githubusercontent.com/eduardoplima/aed-lener-br/refs/heads/main/leNER-Br/train/train.conll
+!wget https://raw.githubusercontent.com/eduardoplima/aed-lener-br/refs/heads/main/leNER-Br/test/test.conll
+
+```
+
+    --2025-05-17 21:16:22--  https://raw.githubusercontent.com/eduardoplima/aed-lener-br/refs/heads/main/leNER-Br/train/train.conll
+    Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 185.199.108.133, 185.199.109.133, 185.199.110.133, ...
+    Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|185.199.108.133|:443... connected.
+    HTTP request sent, awaiting response... 200 OK
+    Length: 2142199 (2.0M) [text/plain]
+    Saving to: ‘train.conll’
+    
+    train.conll         100%[===================>]   2.04M  --.-KB/s    in 0.01s   
+    
+    2025-05-17 21:16:22 (198 MB/s) - ‘train.conll’ saved [2142199/2142199]
+    
+    --2025-05-17 21:16:22--  https://raw.githubusercontent.com/eduardoplima/aed-lener-br/refs/heads/main/leNER-Br/test/test.conll
+    Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 185.199.108.133, 185.199.109.133, 185.199.110.133, ...
+    Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|185.199.108.133|:443... connected.
+    HTTP request sent, awaiting response... 200 OK
+    Length: 438441 (428K) [text/plain]
+    Saving to: ‘test.conll’
+    
+    test.conll          100%[===================>] 428.17K  --.-KB/s    in 0.004s  
+    
+    2025-05-17 21:16:23 (106 MB/s) - ‘test.conll’ saved [438441/438441]
+    
+
+
+
+```python
+NUM_FOLDS_CV = 5
+RANDOM_SEED = 43 # almost 42 😂 (and prime!)
+```
+
+
+```python
+def load_conll_lener(file_path):
+    sentences = []
+    current_sentence_tokens = []
+    current_sentence_labels = []
+
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+          line = line.strip()
+          if line:
+              parts = line.split()
+              if len(parts) >= 2:
+                  token = parts[0]
+                  ner_tag = parts[-1]
+                  current_sentence_tokens.append(token)
+                  current_sentence_labels.append(ner_tag)
+              else:
+                  pass # Or handle malformed lines
+          else:
+              if current_sentence_tokens:
+                  sentences.append(list(zip(current_sentence_tokens, current_sentence_labels)))
+                  current_sentence_tokens = []
+                  current_sentence_labels = []
+
+        if current_sentence_tokens: # Add last sentence if file doesn't end with a blank line
+            sentences.append(list(zip(current_sentence_tokens, current_sentence_labels)))
+
+    return sentences
+```
+
+
+```python
+training_sentences = load_conll_lener("train.conll")
+print(f"\nLoaded {len(training_sentences)} sentences from train.conll.")
+```
+
+    
+    Loaded 7827 sentences from train.conll.
+
+
+Below are some example sentences in BIO format.
+
+
+```python
+print("\nExample sentence:")
+if len(training_sentences) > 5:
+    for token, label in training_sentences[5][-50:]:
+        print(f"{token}\t{label}")
+```
+
+    
+    Example sentence:
+    V.v	O
+    APELAÇÃO	O
+    CÍVEL	O
+    -	O
+    NULIDADE	O
+    PROCESSUAL	O
+    -	O
+    INTIMAÇÃO	O
+    DO	O
+    MINISTÉRIO	B-ORGANIZACAO
+    PÚBLICO	I-ORGANIZACAO
+    -	O
+    INCAPAZ	O
+    ACOMPANHADA	O
+    DE	O
+    REPRESENTANTE	O
+    LEGAL	O
+    E	O
+    DE	O
+    ADVOGADO	O
+    -	O
+    EXERCÍCIO	O
+    DO	O
+    CONTRADITÓRIO	O
+    E	O
+    DA	O
+    AMPLA	O
+    DEFESA	O
+    -	O
+    AUSÊNCIA	O
+    DE	O
+    PREJUÍZOS	O
+    -	O
+    VÍCIO	O
+    AFASTADO	O
+    -	O
+    IMPROCEDÊNCIA	O
+    DO	O
+    PEDIDO	O
+    -	O
+    INEXISTÊNCIA	O
+    DE	O
+    PROVA	O
+    QUANTO	O
+    AO	O
+    FATO	O
+    CONSTITUTIVO	O
+    DO	O
+    DIREITO	O
+    .	O
+
+
+# Token Extraction
+
+As we saw, the extracted sentences are organized into tuples of tokens and their respective BIO labels. The goal is to extract features for each token from our training sentences using a BERT model via Hugging Face: in this case, neuralmind/bert-large-portuguese-cased. We explicitly define a maximum size of 512, the standard size for the chosen BERT model, to avoid OverflowError.
+
+The process followed for each sentence is as follows: first, we extract the token texts. Then, we use `tokenizer_hf` to convert these texts into a format that the BERT model understands, specifying that the input is already divided into words (is_split_into_words=True) and moving the data to the processing device (CPU or GPU). With the inputs ready, we pass them through model_hf to obtain the "hidden states" of the last layer, which are the contextual embeddings for each subword generated by the tokenizer. Since BERT works with subwords, we need to align these embeddings back to our original tokens. For this, we use the word_ids provided by the tokenizer and, for each original token, we calculate the average of the embeddings of its constituent subwords. These mean vectors are then added to our final features_tokens list, numerically representing each word in our corpus.
+
+
+
+
+```python
+hf_model_name = "neuralmind/bert-large-portuguese-cased"
+
+tokenizer_hf = AutoTokenizer.from_pretrained(hf_model_name)
+model_hf = AutoModel.from_pretrained(hf_model_name)
+```
+
+
+    tokenizer_config.json:   0%|          | 0.00/155 [00:00<?, ?B/s]
+
+
+
+    config.json:   0%|          | 0.00/648 [00:00<?, ?B/s]
+
+
+
+    vocab.txt:   0%|          | 0.00/210k [00:00<?, ?B/s]
+
+
+
+    added_tokens.json:   0%|          | 0.00/2.00 [00:00<?, ?B/s]
+
+
+
+    special_tokens_map.json:   0%|          | 0.00/112 [00:00<?, ?B/s]
+
+
+
+    pytorch_model.bin:   0%|          | 0.00/1.34G [00:00<?, ?B/s]
+
+
+
+```python
+all_tokens = []
+all_labels = []
+ids_sentences= []
+
+for i, sentence in enumerate(training_sentences):
+  for token_text, ner_tag in sentence:
+    all_tokens.append(token_text)
+    all_labels.append(ner_tag)
+    ids_sentences.append(i)
+
+print(f"\nTotal tokens in the training data: {len(all_tokens)}")
+print(f"Unique LeNER-Br labels: {sorted(list(set(all_labels)))}")
+```
+
+    
+    Total tokens in the training data: 229277
+    Unique LeNER-Br labels: ['B-JURISPRUDENCIA', 'B-LEGISLACAO', 'B-LOCAL', 'B-ORGANIZACAO', 'B-PESSOA', 'B-TEMPO', 'I-JURISPRUDENCIA', 'I-LEGISLACAO', 'I-LOCAL', 'I-ORGANIZACAO', 'I-PESSOA', 'I-TEMPO', 'O']
+
+
+We have a total of 13 unique labels in our dataset. Below is an explanation of the meaning of each one:
+
+* **`B-JURISPRUDENCIA`**:
+    * **B**: Indicates that this token is the **beginning** of a named entity.
+    * **JURISPRUDENCIA**: Indicates that the named entity is of type "Jurisprudence". Refers to judicial decisions, rulings, precedents, or any set of interpretations of laws made by courts.
+    * *Example*: In the text "Conforme o **Acórdão** nº 123..." (According to Ruling No. 123...), "Acórdão" could be `B-JURISPRUDENCIA`.
+
+* **`B-LEGISLACAO`**:
+    * **B**: Beginning of the entity.
+    * **LEGISLACAO**: Indicates that the named entity is of type "Legislation". Refers to laws, decrees, ordinances, codes, constitutions, etc.
+    * *Example*: In the text "A **Lei** nº 8.666/93..." (Law No. 8.666/93...), "Lei" could be `B-LEGISLACAO`.
+
+* **`B-LOCAL`**:
+    * **B**: Beginning of the entity.
+    * **LOCAL**: Indicates that the named entity is a "Location". It can be a city, state, country, address, geographical feature, etc.
+    * *Example*: In the text "Ele viajou para **Paris**..." (He traveled to Paris...), "Paris" would be `B-LOCAL`.
+
+* **`B-ORGANIZACAO`**:
+    * **B**: Beginning of the entity.
+    * **ORGANIZACAO**: Indicates that the named entity is an "Organization". Includes companies, government institutions, NGOs, sports teams, etc.
+    * *Example*: In the text "O **Google** anunciou..." (Google announced...), "Google" would be `B-ORGANIZACAO`.
+
+* **`B-PESSOA`**:
+    * **B**: Beginning of the entity.
+    * **PESSOA**: Indicates that the named entity is a "Person". Refers to names of individuals.
+    * *Example*: In the text "**Maria** Silva é advogada..." (Maria Silva is a lawyer...), "Maria" would be `B-PESSOA`.
+
+* **`B-TEMPO`**:
+    * **B**: Beginning of the entity.
+    * **TEMPO**: Indicates that the named entity is a temporal reference. It can be a date, time, specific period (e.g., "21st century", "next week").
+    * *Example*: In the text "A reunião será em **15 de maio**..." (The meeting will be on May 15th...), "15" could be `B-TEMPO`.
+
+* **`I-JURISPRUDENCIA`**:
+    * **I**: Indicates that this token is **inside** a "Jurisprudence" type entity that has already begun. It is a continuation of the entity.
+    * *Example*: In the text "...o **Superior Tribunal** de Justiça..." (...the Superior Court of Justice...), if "Superior" was `B-JURISPRUDENCIA` (or `B-ORGANIZACAO` depending on the scheme), "Tribunal" could be `I-JURISPRUDENCIA` (or `I-ORGANIZACAO`). In the case of a long jurisprudence name, like "Súmula **Vinculante nº** 56" (Binding Precedent No. 56), "Vinculante", "nº", and "56" would be `I-JURISPRUDENCIA` if "Súmula" was `B-JURISPRUDENCIA`.
+
+* **`I-LEGISLACAO`**:
+    * **I**: Inside a "Legislation" type entity.
+    * *Example*: In the text "A **Lei de Licitações**..." (The Bidding Law...), if "Lei" was `B-LEGISLACAO`, "de" and "Licitações" would be `I-LEGISLACAO`.
+
+* **`I-LOCAL`**:
+    * **I**: Inside a "Location" type entity.
+    * *Example*: In the text "Ele mora em **Nova York**..." (He lives in New York...), if "Nova" was `B-LOCAL`, "York" would be `I-LOCAL`.
+
+* **`I-ORGANIZACAO`**:
+    * **I**: Inside an "Organization" type entity.
+    * *Example*: In the text "O **Banco Central** do Brasil..." (The Central Bank of Brazil...), if "Banco" was `B-ORGANIZACAO`, "Central" would be `I-ORGANIZACAO`.
+
+* **`I-PESSOA`**:
+    * **I**: Inside a "Person" type entity.
+    * *Example*: In the text "**Maria Joaquina** da Silva...", if "Maria" was `B-PESSOA`, "Joaquina" would be `I-PESSOA`.
+
+* **`I-TEMPO`**:
+    * **I**: Inside a "Time" type entity.
+    * *Example*: In the text "A reunião será em **15 de maio de 2025**..." (The meeting will be on May 15, 2025...), if "15" was `B-TEMPO`, "de", "maio", "de", and "2025" would be `I-TEMPO`.
+
+* **`O`**:
+    * **O**: Indicates that the token is **outside** any named entity. It is a common token that is not part of a specific category of interest.
+    * *Example*: In the text "O gato **sentou** no tapete." (The cat sat on the carpet.), "sentou" would be `O`.
+
+
+
+```python
+import numpy as np
+import torch
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
+EFFECTIVE_MAX_LENGTH = 512
+
+model_hf.to(device)
+model_hf.eval()
+
+features_tokens = []
+
+for i_sent, sentence_data in enumerate(training_sentences):
+    sentence_texts = [token_data[0] for token_data in sentence_data]
+
+    if not sentence_texts:
+        continue
+
+    inputs = tokenizer_hf(
+        sentence_texts,
+        is_split_into_words=True,
+        return_tensors="pt",
+        padding="longest",
+        truncation=True,
+        max_length=EFFECTIVE_MAX_LENGTH
+    ).to(device)
+
+    word_ids = inputs.word_ids()
+    with torch.no_grad():
+        outputs = model_hf(**inputs)
+        last_hidden_state = outputs.last_hidden_state
+
+    token_subword_embeddings = [[] for _ in range(len(sentence_texts))]
+
+    for subword_idx, original_word_idx in enumerate(word_ids):
+        if original_word_idx is not None:
+            embedding = last_hidden_state[0, subword_idx, :]
+            token_subword_embeddings[original_word_idx].append(embedding)
+
+    current_sentence_token_features = []
+    for original_token_idx in range(len(sentence_texts)):
+        if token_subword_embeddings[original_token_idx]:
+            stacked_embeddings = torch.stack(token_subword_embeddings[original_token_idx])
+            mean_embedding = torch.mean(stacked_embeddings, dim=0)
+            current_sentence_token_features.append(mean_embedding.cpu().numpy())
+        else:
+            current_sentence_token_features.append(np.zeros(model_hf.config.hidden_size))
+
+    features_tokens.extend(current_sentence_token_features)
+
+```
+
+    Using device: cuda
+
+
+
+```python
+features_tokens = np.array(features_tokens)
+print(f"Shape of the token features matrix: {features_tokens.shape}")
+```
+
+    Shape of the token features matrix: (229277, 1024)
+
+
+# Model Training
+
+We need to train a model for use with the cleanlab library. Initially, the NER labels are transformed using LabelEncoder, which converts the labels into numbers for use in the chosen model.
+
+In the actual training of our model, we divide our dataset (`features_tokens` and `labels_ner_codificados`) into two parts: one for training (`X_treino`,`y_treino`) and another for testing (`X_teste`, `y_teste`). We use 25% of the data for the test set and ensure that the proportion of different NER label classes is maintained in both splits, thanks to the stratify parameter. Next, we prepare an array called `probabilidades_preditas_teste`, which will store the probabilities of each class that our model will assign to the examples in the test set.
+
+Then, we define and train our classification model. We opted for an SGDClassifier (Stochastic Gradient Descent Classifier). It works by adjusting the parameters of a linear model (in this case, configured to behave like a Logistic Regression using loss='log_loss') iteratively, processing one sample at a time, making it fast and scalable. After training the model, we use it to predict the class probabilities for the `X_teste` set, storing them in `probabilidades_preditas_teste`. Finally, we also calculate and display the model's accuracy on this test set, comparing the predictions with the true y_teste labels.
+
+A KFold strategy with 5 folds was used to go through the entire dataset separately and independently to obtain out-of-sample predictions for every instance.
+
+
+```python
+label_encoder = LabelEncoder()
+ner_labels_encoded = label_encoder.fit_transform(all_labels)
+num_classes = len(label_encoder.classes_)
+```
+
+# Issues Found with the Dataset
+
+Now we delve into the actual application of confident learning techniques. Initially, we use the `find_label_issues` function from the cleanlab library to identify potentially mislabeled tokens in our NER dataset. We pass the encoded labels (`ner_labels_encoded`) and the model's predicted probabilities (`predicted_probabilities`) as input.
+
+
+```python
+skf = StratifiedKFold(n_splits=NUM_FOLDS_CV, shuffle=True, random_state=RANDOM_SEED)
+predicted_probabilities = np.zeros((len(features_tokens), num_classes))
+print(f"\nStarting {NUM_FOLDS_CV}-fold cross-validation")
+
+for fold_index, (train_indices, validation_indices) in enumerate(skf.split(features_tokens, ner_labels_encoded)):
+    print(f"  Processing Fold {fold_index + 1}/{NUM_FOLDS_CV}...")
+    X_train, X_validation = features_tokens[train_indices], features_tokens[validation_indices]
+    y_train, y_validation = ner_labels_encoded[train_indices], ner_labels_encoded[validation_indices]
+
+    model = SGDClassifier(
+            loss='log_loss',
+            penalty='l2',
+            alpha=0.0001,
+            max_iter=1000,
+            tol=1e-3,
+            random_state=RANDOM_SEED,
+            class_weight='balanced',
+            learning_rate='optimal',
+            early_stopping=True,
+            n_iter_no_change=10,
+            validation_fraction=0.1
+        )
+
+    model.fit(X_train, y_train)
+    print("Model trained.")
+    fold_predicted_probabilities = model.predict_proba(X_validation)
+    predicted_probabilities[validation_indices] = fold_predicted_probabilities
+
+    fold_predictions = model.predict(X_validation)
+    fold_accuracy = accuracy_score(y_validation, fold_predictions)
+    print(f"    Fold {fold_index + 1} Accuracy: {fold_accuracy:.4f}")
+
+print("\nCollection of out-of-sample predicted probabilities finished.")
+print(f"Shape of the predicted probabilities matrix: {predicted_probabilities.shape}")
+```
+
+    
+    Starting 5-fold cross-validation
+      Processing Fold 1/5...
+    Model trained.
+        Fold 1 Accuracy: 0.9680
+      Processing Fold 2/5...
+    Model trained.
+        Fold 2 Accuracy: 0.9734
+      Processing Fold 3/5...
+    Model trained.
+        Fold 3 Accuracy: 0.9696
+      Processing Fold 4/5...
+    Model trained.
+        Fold 4 Accuracy: 0.9720
+      Processing Fold 5/5...
+    Model trained.
+        Fold 5 Accuracy: 0.9719
+    
+    Collection of out-of-sample predicted probabilities finished.
+    Shape of the predicted probabilities matrix: (229277, 13)
+
+
+
+```python
+print("\nIdentifying labeling issues with cleanlab...")
+
+label_issue_indices = find_label_issues(
+        labels=ner_labels_encoded,
+        pred_probs=predicted_probabilities,
+        return_indices_ranked_by='self_confidence'
+    )
+
+num_issues_found = len(label_issue_indices)
+print(f"Cleanlab identified {num_issues_found} potential labeling issues.")
+percentage_issues = (num_issues_found / len(all_tokens)) * 100
+print(f"This represents {percentage_issues:.2f}% of the total tokens.")
+```
+
+    
+    Identifying labeling issues with cleanlab...
+    Cleanlab identified 2326 potential labeling issues.
+    This represents 1.01% of the total tokens.
+
+
+
+Next, we iterate through the indices of tokens that have potential annotation errors in the NER dataset, comparing the original labels with the model's suggested labels. For each token identified as problematic, we retrieve the token and its label, and transform it to its textual form using the label_encoder (method `inverse_transform`).
+
+Then, we identify the label predicted by the model with the highest probability and also decode it. We calculate the model's confidence in the original label and retrieve the identifier of the sentence to which the token belongs. Finally, we gather all this information into a list of `dicts` (`issues_for_review`).
+
+The stored `dict` has the following fields that will be useful for our subsequent analysis:
+
+* `global_token_index`: position of the token in our list of all tokens in our dataset
+* `sentence_id`: identifier of the problematic sentence
+* `original_label`: the label associated with the token in the dataset
+* `model_suggested_label`: the label our model suggests for the token
+* `model_confidence_in_original_label`: the probability the model assigns to the original label. Low values mean our model is not very confident that the original label is correct.
+* `full_sentence_context`: complete sentence where the problematic token was found. It will be used to visualize the problems that will be addressed in a later step.
+
+
+
+```python
+issues_for_review = []
+for global_token_index in label_issue_indices:
+    original_token = all_tokens[global_token_index]
+    original_label_encoded = ner_labels_encoded[global_token_index]
+    original_label_str = label_encoder.inverse_transform([original_label_encoded])[0]
+    predicted_label_encoded = np.argmax(predicted_probabilities[global_token_index])
+    predicted_label_str = label_encoder.inverse_transform([predicted_label_encoded])[0]
+
+    confidence_in_original = predicted_probabilities[global_token_index, original_label_encoded]
+
+    sent_id = ids_sentences[global_token_index]
+
+    issues_for_review.append({
+        "global_token_index": global_token_index,
+        "sentence_id": sent_id,
+        "token": original_token,
+        "original_label": original_label_str,
+        "model_suggested_label": predicted_label_str,
+        "model_confidence_in_original_label": confidence_in_original,
+        "full_sentence_context": training_sentences[sent_id]
+    })
+
+```
+
+We sort the issues by the lowest model confidence in the originally provided labels and then we visualize the issues found. In the following loop, we have the 20 issues with the lowest model confidence in the original label, i.e., highest distrust.
+
+
+```python
+sorted_issues_for_review = sorted(issues_for_review, key=lambda x: x['model_confidence_in_original_label'])
+
+for i, issue in enumerate(sorted_issues_for_review[:min(20, num_issues_found)]):
+    print(f"\nProblem #{i+1} (Global Token Index: {issue['global_token_index']})")
+    print(f"  Sentence ID: {issue['sentence_id']}")
+    print(f"  Token: '{issue['token']}'")
+    print(f"  Original Label: {issue['original_label']}")
+    print(f"  Model Suggested Label: {issue['model_suggested_label']}")
+    print(f"  Model Confidence in Original Label: {issue['model_confidence_in_original_label']:.4f}")
+
+    sentence_tokens_tags = issue['full_sentence_context']
+
+    first_token_index_in_global_dataset = -1
+    for global_idx, global_sent_id in enumerate(ids_sentences):
+        if global_sent_id == issue['sentence_id']:
+            first_token_index_in_global_dataset = global_idx
+            break
+
+    token_position_in_sentence = issue['global_token_index'] - first_token_index_in_global_dataset
+
+    if not (0 <= token_position_in_sentence < len(sentence_tokens_tags)) or \
+       sentence_tokens_tags[token_position_in_sentence][0] != issue['token']:
+        found_in_fallback = False
+        for sent_idx, (sent_tk, _) in enumerate(sentence_tokens_tags):
+            if sent_tk == issue['token']:
+                token_position_in_sentence = sent_idx
+                found_in_fallback = True
+                break
+        if not found_in_fallback:
+            print(f"  WARNING: Could not reliably determine token position for context display for token '{issue['token']}'.")
+            continue
+
+    context_window = 10
+
+    prev_ctx_start = max(0, token_position_in_sentence - context_window)
+    previous_context_data = sentence_tokens_tags[prev_ctx_start : token_position_in_sentence]
+    formatted_previous_context = [f"{tk}({tag})" for tk, tag in previous_context_data]
+
+    problematic_token_text = issue['token']
+    problematic_original_label = issue['original_label']
+    problematic_suggested_label = issue['model_suggested_label']
+    highlighted_token_str = f"**{problematic_token_text}**(Original:{problematic_original_label}|Suggested:{problematic_suggested_label})**"
+
+    post_ctx_start = token_position_in_sentence + 1
+    post_ctx_end = min(len(sentence_tokens_tags), post_ctx_start + context_window)
+    subsequent_context_data = sentence_tokens_tags[post_ctx_start : post_ctx_end]
+    formatted_subsequent_context = [f"{tk}({tag})" for tk, tag in subsequent_context_data]
+
+    final_context_parts = []
+    if formatted_previous_context:
+        final_context_parts.append(" ".join(formatted_previous_context))
+
+    final_context_parts.append(highlighted_token_str)
+
+    if formatted_subsequent_context:
+        final_context_parts.append(" ".join(formatted_subsequent_context))
+
+    print(f"  Context (±{context_window} words): {' '.join(final_context_parts)}")
+
+print("\nEnd of issue display.")
+
+```
+
+    
+    Problem #1 (Global Token Index: 138519)
+      Sentence ID: 4905
+      Token: 'artigo'
+      Original Label: B-LOCAL
+      Model Suggested Label: B-LEGISLACAO
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): Logo(O) ,(O) tem-se(O) que(O) o(O) **artigo**(Original:B-LOCAL|Suggested:B-LEGISLACAO)** 276(I-LOCAL) do(I-LOCAL) Decreto(I-LOCAL) nº(I-LOCAL) 3.048/99(I-LOCAL) especificamente(O) fixa(O) o(O) dia(O) dois(O)
+    
+    Problem #2 (Global Token Index: 122878)
+      Sentence ID: 4323
+      Token: 'Autos'
+      Original Label: B-LOCAL
+      Model Suggested Label: B-JURISPRUDENCIA
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): 68(O) 3302-0444/0445(O) ,(O) Rio(B-LOCAL) Branco-AC(I-LOCAL) -(O) Mod(O) .(O) 500258(O) -(O) **Autos**(Original:B-LOCAL|Suggested:B-JURISPRUDENCIA)** n.º(I-LOCAL) 1002199-81.2017.8.01.0000/50000(I-LOCAL) ARAÚJO(O) ,(O) QUARTA(B-ORGANIZACAO) TURMA(I-ORGANIZACAO) ,(O) julgado(O) em(O) 09/05/2017(B-TEMPO)
+    
+    Problem #3 (Global Token Index: 33548)
+      Sentence ID: 1067
+      Token: ','
+      Original Label: I-LOCAL
+      Model Suggested Label: O
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): CONSTRUÇÃO(O) E(O) ALTERA(O) O(O) USO(O) DE(O) LOTES(O) NA(O) QUADRA(B-LOCAL) 1(I-LOCAL) **,**(Original:I-LOCAL|Suggested:O)** DO(I-LOCAL) SETOR(I-LOCAL) DE(I-LOCAL) INDÚSTRIAS(I-LOCAL) GRÁFICAS(I-LOCAL) ,(O) NA(O) REGIÃO(B-LOCAL) ADMINISTRATIVA(I-LOCAL) DO(I-LOCAL)
+    
+    Problem #4 (Global Token Index: 122879)
+      Sentence ID: 4323
+      Token: 'n.º'
+      Original Label: I-LOCAL
+      Model Suggested Label: I-JURISPRUDENCIA
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): 3302-0444/0445(O) ,(O) Rio(B-LOCAL) Branco-AC(I-LOCAL) -(O) Mod(O) .(O) 500258(O) -(O) Autos(B-LOCAL) **n.º**(Original:I-LOCAL|Suggested:I-JURISPRUDENCIA)** 1002199-81.2017.8.01.0000/50000(I-LOCAL) ARAÚJO(O) ,(O) QUARTA(B-ORGANIZACAO) TURMA(I-ORGANIZACAO) ,(O) julgado(O) em(O) 09/05/2017(B-TEMPO) ,(O)
+    
+    Problem #5 (Global Token Index: 56502)
+      Sentence ID: 1863
+      Token: 'TAPE'
+      Original Label: B-LOCAL
+      Model Suggested Label: O
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): COMPROMISSO(O) É(O) COM(O) A(O) VERDADE(O) POR(O) ISSO(O) O(O) PSDB(B-ORGANIZACAO) 1(O) **TAPE**(Original:B-LOCAL|Suggested:O)** VI(I-LOCAL) APOIA(O) IGOR(B-PESSOA) E(O) TECO(B-PESSOA) .(O)
+    
+    Problem #6 (Global Token Index: 138520)
+      Sentence ID: 4905
+      Token: '276'
+      Original Label: I-LOCAL
+      Model Suggested Label: I-LEGISLACAO
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): Logo(O) ,(O) tem-se(O) que(O) o(O) artigo(B-LOCAL) **276**(Original:I-LOCAL|Suggested:I-LEGISLACAO)** do(I-LOCAL) Decreto(I-LOCAL) nº(I-LOCAL) 3.048/99(I-LOCAL) especificamente(O) fixa(O) o(O) dia(O) dois(O) do(O)
+    
+    Problem #7 (Global Token Index: 173708)
+      Sentence ID: 6020
+      Token: 'Penal'
+      Original Label: I-TEMPO
+      Model Suggested Label: I-LEGISLACAO
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): 2.848(I-LEGISLACAO) ,(O) de(O) 7(B-TEMPO) de(I-TEMPO) dezembro(I-TEMPO) de(I-TEMPO) 1940(I-TEMPO) ((O) Código(B-TEMPO) **Penal**(Original:I-TEMPO|Suggested:I-LEGISLACAO)** )(O) ,(O) passa(O) a(O) vigorar(O) com(O) as(O) seguintes(O) alterações(O) :(O)
+    
+    Problem #8 (Global Token Index: 45419)
+      Sentence ID: 1482
+      Token: 'única'
+      Original Label: I-LOCAL
+      Model Suggested Label: I-ORGANIZACAO
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): fls(O) .(O) 23-TJ(O) pelo(O) douto(O) Juiz(O) de(O) Direito(O) da(O) Vara(B-LOCAL) **única**(Original:I-LOCAL|Suggested:I-ORGANIZACAO)** da(I-LOCAL) Comarca(I-LOCAL) de(I-LOCAL) Santa(I-LOCAL) Maria(I-LOCAL) do(I-LOCAL) Suaçuí/MG(I-LOCAL) ,(O) que(O) indeferiu(O)
+    
+    Problem #9 (Global Token Index: 122880)
+      Sentence ID: 4323
+      Token: '1002199-81.2017.8.01.0000/50000'
+      Original Label: I-LOCAL
+      Model Suggested Label: I-JURISPRUDENCIA
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): ,(O) Rio(B-LOCAL) Branco-AC(I-LOCAL) -(O) Mod(O) .(O) 500258(O) -(O) Autos(B-LOCAL) n.º(I-LOCAL) **1002199-81.2017.8.01.0000/50000**(Original:I-LOCAL|Suggested:I-JURISPRUDENCIA)** ARAÚJO(O) ,(O) QUARTA(B-ORGANIZACAO) TURMA(I-ORGANIZACAO) ,(O) julgado(O) em(O) 09/05/2017(B-TEMPO) ,(O) DJe(O)
+    
+    Problem #10 (Global Token Index: 28356)
+      Sentence ID: 943
+      Token: 'Estrada'
+      Original Label: I-LOCAL
+      Model Suggested Label: B-LOCAL
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): conformidade(O) com(O) as(O) seguintes(O) especificações(O) :(O) I(O) localização(O) :(O) DF-001(B-LOCAL) **Estrada**(Original:I-LOCAL|Suggested:B-LOCAL)** Parque(I-LOCAL) Contorno(I-LOCAL) EPCT(I-LOCAL) ,(O) km(O) 12,8(O) ,(O) na(O) Região(B-LOCAL) Administrativa(I-LOCAL)
+    
+    Problem #11 (Global Token Index: 57701)
+      Sentence ID: 1912
+      Token: 'Ceará'
+      Original Label: B-LOCAL
+      Model Suggested Label: I-ORGANIZACAO
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): ementas(O) de(O) julgados(O) dos(O) TREs(O) de(O) Minas(B-LOCAL) Gerais(I-LOCAL) e(O) do(O) **Ceará**(Original:B-LOCAL|Suggested:I-ORGANIZACAO)** .(O)
+    
+    Problem #12 (Global Token Index: 54465)
+      Sentence ID: 1795
+      Token: '27/02/2015'
+      Original Label: B-PESSOA
+      Model Suggested Label: B-TEMPO
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): MOURA(I-PESSOA) ,(O) SEXTA(B-ORGANIZACAO) TURMA(I-ORGANIZACAO) ,(O) julgado(O) em(O) 09/12/2014(B-TEMPO) ,(O) DJe(O) **27/02/2015**(Original:B-PESSOA|Suggested:B-TEMPO)** ;(O) HC(B-JURISPRUDENCIA) 312.391/SP(I-JURISPRUDENCIA) ,(O) Rel(O) .(O) Ministro(O) FELIX(B-PESSOA) FISCHER(I-PESSOA) ,(O)
+    
+    Problem #13 (Global Token Index: 96444)
+      Sentence ID: 3240
+      Token: 'artigo'
+      Original Label: B-ORGANIZACAO
+      Model Suggested Label: B-LEGISLACAO
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): não(O) concretização(O) ,(O) pelo(O) paciente(O) ,(O) do(O) tipo(O) previsto(O) no(O) **artigo**(Original:B-ORGANIZACAO|Suggested:B-LEGISLACAO)** 187(I-ORGANIZACAO) do(I-ORGANIZACAO) Código(I-ORGANIZACAO) Penal(I-ORGANIZACAO) Militar(I-ORGANIZACAO) -(O) Crime(O) de(O) Deserção(O) -(O)
+    
+    Problem #14 (Global Token Index: 9642)
+      Sentence ID: 341
+      Token: 'período'
+      Original Label: B-TEMPO
+      Model Suggested Label: O
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): $(O) 30.000,00(O) ((O) trinta(O) mil(O) reais(O) )(O) ,(O) alusivos(O) o(O) **período**(Original:B-TEMPO|Suggested:O)** de(I-TEMPO) maio(I-TEMPO) a(I-TEMPO) novembro(I-TEMPO) de(I-TEMPO) 2014(I-TEMPO) ;(O) c(O) )(O) R(O)
+    
+    Problem #15 (Global Token Index: 33464)
+      Sentence ID: 1066
+      Token: 'Federal.Por'
+      Original Label: I-LOCAL
+      Model Suggested Label: O
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): iniciativa(O) do(O) processo(O) legislativo(O) compete(O) privativamente(O) ao(O) Governador(O) do(O) Distrito(B-LOCAL) **Federal.Por**(Original:I-LOCAL|Suggested:O)** isso(O) mesmo(O) ,(O) demonstrado(O) que(O) a(O) iniciativa(O) das(O) leis(O) distritais(O)
+    
+    Problem #16 (Global Token Index: 84104)
+      Sentence ID: 2801
+      Token: 'Porta-Aviões'
+      Original Label: B-LOCAL
+      Model Suggested Label: I-LOCAL
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): ((O) ...(O) )(O) que(O) conheceu(O) o(O) Acusado(O) quando(O) serviu(O) no(O) **Porta-Aviões**(Original:B-LOCAL|Suggested:I-LOCAL)** São(I-LOCAL) Paulo(I-LOCAL) ;(O) ((O) ...(O) )(O) que(O) o(O) endereço(O) do(O)
+    
+    Problem #17 (Global Token Index: 138521)
+      Sentence ID: 4905
+      Token: 'do'
+      Original Label: I-LOCAL
+      Model Suggested Label: I-LEGISLACAO
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): Logo(O) ,(O) tem-se(O) que(O) o(O) artigo(B-LOCAL) 276(I-LOCAL) **do**(Original:I-LOCAL|Suggested:I-LEGISLACAO)** Decreto(I-LOCAL) nº(I-LOCAL) 3.048/99(I-LOCAL) especificamente(O) fixa(O) o(O) dia(O) dois(O) do(O) mês(O)
+    
+    Problem #18 (Global Token Index: 181082)
+      Sentence ID: 6176
+      Token: 'Automóvel'
+      Original Label: I-LOCAL
+      Model Suggested Label: B-LOCAL
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): -(O) São(B-LOCAL) Sebastião(I-LOCAL) ;(O) XXVII(O) -(O) SCIA(B-LOCAL) ((O) Cidade(B-LOCAL) do(I-LOCAL) **Automóvel**(Original:I-LOCAL|Suggested:B-LOCAL)** e(O) Estrutural(B-LOCAL) )(O) ;(O) XXVIII(O) -(O) SIA(B-LOCAL) e(O) Setores(O) Complementares(O)
+    
+    Problem #19 (Global Token Index: 45418)
+      Sentence ID: 1482
+      Token: 'Vara'
+      Original Label: B-LOCAL
+      Model Suggested Label: I-ORGANIZACAO
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): às(O) fls(O) .(O) 23-TJ(O) pelo(O) douto(O) Juiz(O) de(O) Direito(O) da(O) **Vara**(Original:B-LOCAL|Suggested:I-ORGANIZACAO)** única(I-LOCAL) da(I-LOCAL) Comarca(I-LOCAL) de(I-LOCAL) Santa(I-LOCAL) Maria(I-LOCAL) do(I-LOCAL) Suaçuí/MG(I-LOCAL) ,(O) que(O)
+    
+    Problem #20 (Global Token Index: 9667)
+      Sentence ID: 341
+      Token: 'período'
+      Original Label: B-TEMPO
+      Model Suggested Label: O
+      Model Confidence in Original Label: 0.0000
+      Context (±10 words): e(O) cinco(O) mil(O) reais(O) )(O) por(O) cada(O) mês(O) referente(O) ao(O) **período**(Original:B-TEMPO|Suggested:O)** de(I-TEMPO) novembro(I-TEMPO) de(I-TEMPO) 2014(I-TEMPO) outubro(I-TEMPO) de(I-TEMPO) 2015(I-TEMPO) ((O) data(O) da(O)
+    
+    End of issue display.
+
+
+At this point, we analyze the output of our confident learning model. We see that in the first identified problems, the model correctly pointed out errors in human annotation. Problems #1 and #2 are clearly examples of erroneously registered legislation: \*\*artigo\*\*(Original:B-LOCAL|Suggested:B-LEGISLACAO)\*\* 276(I-LOCAL) and \*\*Autos\*\*(Original:B-LOCAL|Suggested:B-JURISPRUDENCIA)\*\* n.º(I-LOCAL) 1002199-81.2017.8.01.0000/50000(I-LOCAL).
+
+However, there are examples where our model was confused in pointing out problems in original labels. In problem #3, the comma in the address QUADRA(B-LOCAL) 1(I-LOCAL) \*\* , \*\*(Original:I-LOCAL|Suggested:O)** DO(I-LOCAL) SETOR(I-LOCAL) DE(I-LOCAL) INDÚSTRIAS(I-LOCAL) GRÁFICAS(I-LOCAL) should, in fact, be considered part of the LOCAL label.
+
+Despite the example of the model's mistake, its efficiency in identifying problematic labels is noticeable, attesting to the effectiveness of the applied technique.
+
+
+
+# Conclusion
+
+In this notebook, we applied Confident Learning techniques using the cleanlab library to detect annotation errors in the LeNER-Br dataset, widely used in Named Entity Recognition (NER) tasks in the Portuguese language.
+
+We automatically identified several inconsistent labels between human annotations and the trained model's predictions, based on low confidence criteria. It was observed that many of the errors pointed out by the model indeed indicated labeling flaws in the original set, such as the mistaken annotation of legal expressions and jurisprudence names as locations.
+
+Although some false positives were identified — such as the case of the comma in the address incorrectly classified by the model — the results demonstrate the relevance of the technique for auditing and refining manually annotated datasets.
+
+We conclude that the use of Confident Learning represents an effective approach for improving the quality of annotated datasets, especially in sensitive tasks like legal NER, where annotation errors can significantly impact model performance.
+
+As a future step, the application of automated or semi-automated retagging techniques is recommended to correct the labels identified as problematic, using the model's highest confidence predictions as an initial suggestion for human review.

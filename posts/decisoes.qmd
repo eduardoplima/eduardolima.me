@@ -2,8 +2,12 @@
 title: "Using LLMs to Extract Legal Entities from Audit Court Decisions"
 description: "This post demonstrates a hybrid pipeline with regular expressions and LLMs to extract fines, reimbursements, and recommendations from Brazilian audit court decisions."
 author: "Eduardo P. Lima"
-date: "2021-05-22"
-date-modified: "2021-05-23"
+date: "2021-01-22"
+date-modified: "2021-01-22"
+
+categories:
+  - Data Science
+  - LLM
 ---
 
 
